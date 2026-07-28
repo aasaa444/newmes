@@ -23,9 +23,15 @@
 sqllocaldb start MSSQLLocalDB
 dotnet run --project src/Mes.Api
 # http://localhost:5101
+# 或: pwsh -File scripts/run-api.ps1
 ```
 
 健康检查：`GET /health`
+
+**若感觉「API 自己停了」：**  
+本仓库项目已设 `UseAppHost=false`，避免编译抢锁时必须杀掉 `Mes.Api.exe`。  
+请用**单独终端**只跑 API；不要在同一窗口边跑 API 边 `dotnet test` 若仍被杀。  
+正常关闭日志会出现 `ApplicationStopping`；**强杀进程时可能没有任何关闭日志**。
 
 ### Web
 

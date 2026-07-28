@@ -80,6 +80,17 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+// 关机原因可见：若进程「自己停」，日志里应出现 ApplicationStopping / Stopped
+// （被任务管理器/Stop-Process 强杀时可能来不及打日志）
+var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
+var lifeLog = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Mes.Lifetime");
+lifetime.ApplicationStarted.Register(() =>
+    lifeLog.LogInformation("MES API 已启动，监听中。关闭原因会写 ApplicationStopping 日志。"));
+lifetime.ApplicationStopping.Register(() =>
+    lifeLog.LogWarning("MES API 正在关闭 (ApplicationStopping) — 常见原因: Ctrl+C、dotnet 宿主结束、或进程被外部终止。"));
+lifetime.ApplicationStopped.Register(() =>
+    lifeLog.LogWarning("MES API 已停止 (ApplicationStopped)。"));
+
 // ----- 启动时建库 + 种子（Testing 由 Factory 自己 EnsureCreated/Seed）-----
 if (!app.Environment.IsEnvironment("Testing"))
 {

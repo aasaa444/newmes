@@ -4,6 +4,12 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      不生成 Mes.Api.exe 宿主：运行中可继续 dotnet build/test，不必 Stop-Process 杀 API。
+      否则编译要覆盖 bin\...\Mes.Api.exe，文件被锁就会失败，开发/助手常被迫杀进程——
+      这是用户感觉「终端自己停掉」的主要原因之一。
+    -->
+    <UseAppHost>false</UseAppHost>
   </PropertyGroup>
 
   <ItemGroup>
