@@ -4,10 +4,14 @@
 
 **Blocked by:** 05 — 质量判定、隔离、返工与报废
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 合格入库更新成品账与 SN/工单进度
-- [ ] 隔离/报废品不可混入可售成品账
-- [ ] 完工/耗料产生可查的模拟回写报文
-- [ ] 审计查询覆盖关键业务动作
-- [ ] 工单可关闭且关闭后关键写操作只读
+- [x] 合格入库更新成品账与 SN/工单进度
+- [x] 隔离/报废品不可混入可售成品账
+- [x] 完工/耗料产生可查的模拟回写报文
+- [x] 审计查询覆盖关键业务动作
+- [x] 工单可关闭且关闭后关键写操作只读
+
+## Answer
+
+CompletionService + FinishedGoodsInventory; ErpWritebackSimulator outbox (MaterialIssue/ProductionReceipt/WorkOrderClose). Isolated/scrapped blocked from FG. Close WO read-only. Plan IntegrationView + station complete button. CompletionSeamTests; suite 38 green.

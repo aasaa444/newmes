@@ -38,6 +38,7 @@ function logout() {
       <div class="nav">
         <router-link to="/plan/master-data">执行主数据</router-link>
         <router-link to="/plan/work-orders">生产工单</router-link>
+        <router-link to="/plan/integration">集成与审计</router-link>
         <router-link to="/plan/audit">业务审计</router-link>
         <router-link to="/station">过站台</router-link>
         <button class="btn ghost" type="button" @click="logout">退出</button>

@@ -98,6 +98,18 @@ async function cancel(id) {
   await load()
 }
 
+async function closeOrder(id) {
+  error.value = ''
+  const res = await api(`/api/work-orders/${id}/close`, { method: 'POST', body: '{}' })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    error.value = body.error || `关闭失败 ${res.status}`
+    return
+  }
+  message.value = '工单已关闭'
+  await load()
+}
+
 function logout() {
   clearSession()
   router.push('/login')
@@ -168,6 +180,14 @@ function logout() {
                 @click="cancel(w.id)"
               >
                 取消
+              </button>
+              <button
+                v-if="user?.role === 'Planner' && w.status === 'Completed'"
+                class="btn"
+                type="button"
+                @click="closeOrder(w.id)"
+              >
+                关闭
               </button>
             </td>
           </tr>

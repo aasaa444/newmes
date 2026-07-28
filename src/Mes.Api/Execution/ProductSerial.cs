@@ -27,12 +27,13 @@ public class ProductSerial
 
 /// <summary>
 /// 个体状态：InProcess 可过站；Isolated 须放行；Scrapped 终态；
-/// RouteCompleted 待入库（票 06），隔离品不得当合格入库。
+/// RouteCompleted 待入库；Completed 已入成品仓（票 06）。隔离品不得当合格入库。
 /// </summary>
 public enum ProcessStepStatus
 {
     InProcess = 0,
     RouteCompleted = 1,
     Scrapped = 2,
-    Isolated = 3
+    Isolated = 3,
+    Completed = 4
 }

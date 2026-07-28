@@ -1,4 +1,5 @@
 using Mes.Api.Data;
+using Mes.Api.Integration;
 using Mes.Api.MasterData;
 using Microsoft.EntityFrameworkCore;
 
@@ -8,7 +9,7 @@ namespace Mes.Api.Execution;
 /// 工单与领料领域服务：状态机、齐套计算、线边扣减。
 /// 端点只做 HTTP/鉴权，规则集中在此便于测试与阅读。
 /// </summary>
-public class WorkOrderService(MesDbContext db)
+public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
 {
     /// <summary>创建草稿工单；不冻结路线，可稍后下达。</summary>
     public async Task<WorkOrder> CreateDraftAsync(
@@ -253,7 +254,14 @@ public class WorkOrderService(MesDbContext db)
         }
 
         await db.SaveChangesAsync(ct);
-        return await db.WorkOrderIssueLines.Where(x => x.WorkOrderId == wo.Id).ToListAsync(ct);
+        var result = await db.WorkOrderIssueLines
+            .Include(x => x.Material)
+            .Where(x => x.WorkOrderId == wo.Id)
+            .ToListAsync(ct);
+
+        // 票 06：领料回写模拟（用友/金蝶风格出站）
+        await erp.EnqueueMaterialIssueAsync(wo, result, ct);
+        return result;
     }
 
     /// <summary>线边收料（计划员补库存）。</summary>
@@ -275,9 +283,17 @@ public class WorkOrderService(MesDbContext db)
         return inv;
     }
 
-    private async Task<WorkOrder> LoadWoAsync(Guid id, CancellationToken ct) =>
-        await db.WorkOrders.Include(w => w.IssueLines).FirstOrDefaultAsync(w => w.Id == id, ct)
-        ?? throw new InvalidOperationException("work order not found");
+    private async Task<WorkOrder> LoadWoAsync(Guid id, CancellationToken ct)
+    {
+        var wo = await db.WorkOrders.Include(w => w.IssueLines).FirstOrDefaultAsync(w => w.Id == id, ct)
+            ?? throw new InvalidOperationException("work order not found");
+        if (wo.Status == WorkOrderStatus.Closed)
+        {
+            throw new InvalidOperationException("work order is closed (read-only)");
+        }
+
+        return wo;
+    }
 }
 
 public record IssueMaterialRequestLine(Guid MaterialId, decimal Quantity);

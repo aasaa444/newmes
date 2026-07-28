@@ -154,6 +154,28 @@ async function onScrap(sn) {
   await refreshLists()
 }
 
+async function onComplete() {
+  error.value = ''
+  const sn = serialInput.value.trim() || lastSerial.value
+  if (!sn) {
+    error.value = '需要成品 SN'
+    return
+  }
+  const res = await api('/api/completion/receive', {
+    method: 'POST',
+    body: JSON.stringify({ serialNo: sn }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    error.value = data.error || `入库失败 ${res.status}`
+    return
+  }
+  lastSerial.value = data.serialNo
+  message.value = `已完工入库 ${data.serialNo} [${data.status}]`
+  await loadGenealogy(data.serialNo)
+  await refreshLists()
+}
+
 async function onBind() {
   error.value = ''
   if (!lastSerial.value || !componentSerial.value || !pcbMaterialId.value) {
@@ -244,6 +266,10 @@ function logout() {
           过站合格
         </button>
       </form>
+
+      <div style="margin-top: 0.75rem">
+        <button class="btn" type="button" @click="onComplete">完工入库（路线完成）</button>
+      </div>
 
       <div style="margin-top: 1rem">
         <label class="field">

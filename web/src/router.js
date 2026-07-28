@@ -10,6 +10,7 @@ import StationHome from './views/station/StationHome.vue'
 import AuditView from './views/plan/AuditView.vue'
 import MasterDataView from './views/plan/MasterDataView.vue'
 import WorkOrdersView from './views/plan/WorkOrdersView.vue'
+import IntegrationView from './views/plan/IntegrationView.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -27,6 +28,11 @@ const routes = [
   {
     path: '/plan/work-orders',
     component: WorkOrdersView,
+    meta: { roles: ['Planner', 'Leader'] },
+  },
+  {
+    path: '/plan/integration',
+    component: IntegrationView,
     meta: { roles: ['Planner', 'Leader'] },
   },
   {

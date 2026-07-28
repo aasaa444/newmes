@@ -85,6 +85,12 @@ docker compose up --build
 - [x] 隔离拦过站；`POST /api/quality/release` / `scrap`；`GET /api/quality/isolated`
 - [x] 报废累加工单 `ScrappedQty`；谱系保留 Fail/Rework/Release/Scrap
 
+### 06 完工入库 / ERP 模拟 / 关单
+- [x] `POST /api/completion/receive` → 成品仓 + 工单完工数
+- [x] 隔离/报废不可入库；`GET /api/inventory/finished-goods`
+- [x] `GET /api/erp/outbox`（领料/入库/关单报文）；`POST .../close`
+- [x] 计划端「集成与审计」页
+
 ## 主数据 API（摘要）
 
 | 方法 | 路径 | 授权 |

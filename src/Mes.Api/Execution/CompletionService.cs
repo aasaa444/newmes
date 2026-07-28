@@ -1,0 +1,165 @@
+using Mes.Api.Data;
+using Mes.Api.Integration;
+using Microsoft.EntityFrameworkCore;
+
+namespace Mes.Api.Execution;
+
+/// <summary>
+/// 完工入库与工单关闭（票 06）。
+/// 仅 RouteCompleted 且非隔离/报废可入库；更新成品账、在制计数、工单完工数；触发 ERP 回写模拟。
+/// </summary>
+public class CompletionService(MesDbContext db, ErpWritebackSimulator erp)
+{
+    /// <summary>合格 SN 完工入库。</summary>
+    public async Task<ProductSerial> CompleteToFinishedGoodsAsync(
+        string serialNo,
+        string operatorUserName,
+        CancellationToken ct = default)
+    {
+        serialNo = serialNo.Trim().ToUpperInvariant();
+        var serial = await db.ProductSerials
+            .Include(s => s.WorkOrder)!.ThenInclude(w => w!.FinishedMaterial)
+            .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
+            ?? throw new InvalidOperationException("product serial not found");
+
+        if (serial.Status == ProcessStepStatus.Isolated)
+        {
+            throw new InvalidOperationException("isolated serial cannot enter finished goods; release or scrap first");
+        }
+
+        if (serial.Status == ProcessStepStatus.Scrapped)
+        {
+            throw new InvalidOperationException("scrapped serial cannot enter finished goods");
+        }
+
+        if (serial.Status == ProcessStepStatus.Completed)
+        {
+            throw new InvalidOperationException("serial already completed to finished goods");
+        }
+
+        if (serial.Status != ProcessStepStatus.RouteCompleted)
+        {
+            throw new InvalidOperationException(
+                $"serial must be RouteCompleted to warehouse, current is {serial.Status}");
+        }
+
+        var wo = await db.WorkOrders
+            .Include(w => w.FinishedMaterial)
+            .FirstAsync(w => w.Id == serial.WorkOrderId, ct);
+
+        if (wo.Status is WorkOrderStatus.Closed or WorkOrderStatus.Cancelled)
+        {
+            throw new InvalidOperationException("work order is closed or cancelled");
+        }
+
+        // 成品账 +1
+        var fgId = wo.FinishedMaterialId;
+        var inv = await db.FinishedGoodsInventories.FirstOrDefaultAsync(i => i.MaterialId == fgId, ct);
+        if (inv is null)
+        {
+            inv = new FinishedGoodsInventory
+            {
+                Id = Guid.NewGuid(),
+                MaterialId = fgId,
+                QuantityOnHand = 0
+            };
+            db.FinishedGoodsInventories.Add(inv);
+        }
+
+        inv.QuantityOnHand += 1;
+
+        serial.Status = ProcessStepStatus.Completed;
+        serial.CurrentProcessStepId = null;
+
+        if (wo.InProcessSerialCount > 0)
+        {
+            wo.InProcessSerialCount -= 1;
+        }
+
+        wo.CompletedQty += 1;
+
+        // 计划达成（含报废）→ 工单已完工
+        if (wo.CompletedQty + wo.ScrappedQty >= wo.PlannedQty
+            && wo.Status is WorkOrderStatus.InProcess or WorkOrderStatus.Released)
+        {
+            wo.Status = WorkOrderStatus.Completed;
+        }
+
+        // 谱系：入库事件（客户端排序，兼容 SQLite DateTimeOffset）
+        var passRows = await db.SerialPassRecords.AsNoTracking()
+            .Where(p => p.ProductSerialId == serial.Id)
+            .ToListAsync(ct);
+        var lastStepId = passRows.OrderByDescending(p => p.OccurredAt).Select(p => p.ProcessStepId).FirstOrDefault();
+
+        if (lastStepId == Guid.Empty && wo.ProcessRouteId is Guid rid)
+        {
+            lastStepId = await db.ProcessSteps.AsNoTracking()
+                .Where(p => p.ProcessRouteId == rid)
+                .OrderByDescending(p => p.Sequence)
+                .Select(p => p.Id)
+                .FirstAsync(ct);
+        }
+
+        if (lastStepId != Guid.Empty)
+        {
+            db.SerialPassRecords.Add(new SerialPassRecord
+            {
+                Id = Guid.NewGuid(),
+                ProductSerialId = serial.Id,
+                ProcessStepId = lastStepId,
+                Result = "Complete",
+                OperatorUserName = operatorUserName,
+                OccurredAt = DateTimeOffset.UtcNow,
+                Remark = "Finished goods receipt"
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+
+        await erp.EnqueueProductionReceiptAsync(
+            wo,
+            serial.SerialNo,
+            wo.FinishedMaterial?.Code ?? "",
+            1,
+            ct);
+
+        return serial;
+    }
+
+    /// <summary>
+    /// 关闭工单：无在制 SN，且已完工或计划已由完工+报废覆盖。
+    /// 关闭后关键写操作只读。
+    /// </summary>
+    public async Task CloseAsync(Guid workOrderId, CancellationToken ct = default)
+    {
+        var wo = await db.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId, ct)
+            ?? throw new InvalidOperationException("work order not found");
+
+        if (wo.Status == WorkOrderStatus.Closed)
+        {
+            throw new InvalidOperationException("already closed");
+        }
+
+        if (wo.Status == WorkOrderStatus.Cancelled)
+        {
+            throw new InvalidOperationException("cancelled orders are not closed via this API");
+        }
+
+        if (wo.InProcessSerialCount > 0)
+        {
+            throw new InvalidOperationException("cannot close while in-process serials remain");
+        }
+
+        // 允许：已完工，或 Released/InProcess 但已无在制且完工+报废已覆盖计划
+        var covered = wo.CompletedQty + wo.ScrappedQty >= wo.PlannedQty;
+        if (wo.Status != WorkOrderStatus.Completed && !covered)
+        {
+            throw new InvalidOperationException(
+                "close requires Completed status or completed+scrapped covering planned qty");
+        }
+
+        wo.Status = WorkOrderStatus.Closed;
+        await db.SaveChangesAsync(ct);
+        await erp.EnqueueWorkOrderCloseAsync(wo, ct);
+    }
+}

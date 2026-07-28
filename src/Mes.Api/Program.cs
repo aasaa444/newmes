@@ -3,6 +3,7 @@ using System.Text;
 using Mes.Api.Data;
 using Mes.Api.Execution;
 using Mes.Api.Identity;
+using Mes.Api.Integration;
 using Mes.Api.MasterData;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,8 @@ builder.Services.AddScoped<AuditService>(); // 业务审计：谁在何时对何
 builder.Services.AddScoped<WorkOrderService>(); // 工单状态机、齐套、领料
 builder.Services.AddScoped<StationPassService>(); // 过站、防跳站、关键件绑定、谱系
 builder.Services.AddScoped<QualityService>(); // 不合格/隔离/返工/报废/放行
+builder.Services.AddScoped<ErpWritebackSimulator>(); // ERP 出站模拟
+builder.Services.AddScoped<CompletionService>(); // 完工入库 / 关单
 
 var connectionString = builder.Configuration.GetConnectionString("MesDb")
     ?? "Server=(localdb)\\MSSQLLocalDB;Database=MesDb;Trusted_Connection=True;TrustServerCertificate=True";
@@ -158,6 +161,9 @@ app.MapWorkOrderEndpoints();
 
 // 票 04：过站台、SN、防跳站、谱系
 app.MapStationPassEndpoints();
+
+// 票 06：完工入库、成品仓、关单、ERP 出站
+app.MapCompletionEndpoints();
 
 app.Run();
 

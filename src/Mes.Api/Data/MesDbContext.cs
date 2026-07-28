@@ -1,5 +1,6 @@
 using Mes.Api.Execution;
 using Mes.Api.Identity;
+using Mes.Api.Integration;
 using Mes.Api.MasterData;
 using Microsoft.EntityFrameworkCore;
 
@@ -7,8 +8,7 @@ namespace Mes.Api.Data;
 
 /// <summary>
 /// MES 统一 DbContext（第一期单体）。
-/// 含：身份/审计 + 执行主数据 + 工单/线边库存（票 03）。
-/// 生产默认 SQL Server；集成测试由 MesApiFactory 换成 SQLite 内存库。
+/// 身份/审计、主数据、工单/线边、SN/谱系、成品仓、ERP 出站（票 06）。
 /// </summary>
 public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(options)
 {
@@ -34,6 +34,10 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
     public DbSet<ProductSerial> ProductSerials => Set<ProductSerial>();
     public DbSet<SerialPassRecord> SerialPassRecords => Set<SerialPassRecord>();
     public DbSet<ComponentBinding> ComponentBindings => Set<ComponentBinding>();
+
+    // ----- 票 06：成品仓 + ERP 出站 -----
+    public DbSet<FinishedGoodsInventory> FinishedGoodsInventories => Set<FinishedGoodsInventory>();
+    public DbSet<ErpOutboxMessage> ErpOutboxMessages => Set<ErpOutboxMessage>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -197,6 +201,24 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
             e.Property(x => x.OperatorUserName).HasMaxLength(64);
             e.HasOne(x => x.ComponentMaterial).WithMany().HasForeignKey(x => x.ComponentMaterialId)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FinishedGoodsInventory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.MaterialId).IsUnique();
+            e.Property(x => x.QuantityOnHand).HasPrecision(18, 4);
+            e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ErpOutboxMessage>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.MessageType).HasMaxLength(64).IsRequired();
+            e.Property(x => x.BusinessKey).HasMaxLength(128);
+            e.Property(x => x.Status).HasMaxLength(32).IsRequired();
+            e.Property(x => x.PayloadJson).IsRequired();
         });
     }
 }
