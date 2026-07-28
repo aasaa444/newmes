@@ -2,7 +2,11 @@ using Mes.Api.Data;
 
 namespace Mes.Api.MasterData;
 
-/// <summary>Electronics assembly demo master data (router-like product).</summary>
+/// <summary>
+/// 离散电子组装演示种子（路由器类成品）。
+/// 幂等：已存在 FG-ROUTER 则整段跳过。
+/// 结构：1 成品 + 2 关键件(SN) + 1 辅料 → 单层 BOM → 5 步线性路线 → 一线 5 工位。
+/// </summary>
 public static class MasterDataSeed
 {
     public static readonly string FinishedCode = "FG-ROUTER";
@@ -50,6 +54,7 @@ public static class MasterDataSeed
             Version = "1",
             IsActive = true
         };
+        // Sequence 10..50；烧录失败可回 10；终检失败可回 30
         var steps = new[]
         {
             Step(route.Id, 10, "ONLINE", "上线装配", false, null),
@@ -72,6 +77,7 @@ public static class MasterDataSeed
         db.ProductionLines.Add(line);
         db.SaveChanges();
 
+        // 一工序一工位，过站台选工位即锁定当前工序
         db.WorkStations.AddRange(
             Station("ST-ONLINE", "上线工位", line.Id, steps[0].Id),
             Station("ST-FLASH", "烧录工位", line.Id, steps[1].Id),

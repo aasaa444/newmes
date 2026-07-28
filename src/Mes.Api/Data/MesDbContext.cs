@@ -4,10 +4,18 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Api.Data;
 
+/// <summary>
+/// MES 统一 DbContext（第一期单体）。
+/// 含：身份/审计 + 执行主数据（物料、BOM、工艺路线、产线工位）。
+/// 生产默认 SQL Server；集成测试由 MesApiFactory 换成 SQLite 内存库。
+/// </summary>
 public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(options)
 {
+    // ----- 票 01：身份与审计 -----
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<BusinessAuditEntry> AuditEntries => Set<BusinessAuditEntry>();
+
+    // ----- 票 02：执行主数据 -----
     public DbSet<Material> Materials => Set<Material>();
     public DbSet<Bom> Boms => Set<Bom>();
     public DbSet<BomLine> BomLines => Set<BomLine>();
@@ -18,6 +26,7 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // 约束与索引集中在此；业务规则仍在端点/领域服务中。
         modelBuilder.Entity<UserAccount>(e =>
         {
             e.HasKey(x => x.Id);

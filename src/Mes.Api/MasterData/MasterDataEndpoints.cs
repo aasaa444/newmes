@@ -5,13 +5,21 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Api.MasterData;
 
+/// <summary>
+/// 执行主数据 HTTP 端点（票 02）。
+/// 读：AnyBusinessRole（计划员/操作工/班组长均可查，过站前要认物料/工位）。
+/// 写：PlannerOnly（非计划员 POST → 403）。
+/// 路径挂在 /api/*，由 Program 调用 MapMasterDataEndpoints()。
+/// </summary>
 public static class MasterDataEndpoints
 {
     public static RouteGroupBuilder MapMasterDataEndpoints(this WebApplication app)
     {
+        // 两组路由共享路径前缀，授权策略不同
         var read = app.MapGroup("/api").RequireAuthorization("AnyBusinessRole");
         var write = app.MapGroup("/api").RequireAuthorization("PlannerOnly");
 
+        // ----- 物料 -----
         read.MapGet("/materials", async (MesDbContext db) =>
         {
             var items = await db.Materials.AsNoTracking()
@@ -310,6 +318,7 @@ public static class MasterDataEndpoints
                 new StationResponse(station.Id, station.Code, station.Name, station.BoundProcessStepId, step.Code, station.ProductionLineId, station.IsActive));
         });
 
+        // 幂等补种（库空或被清空后可用）；已有 FG-ROUTER 则 no-op
         write.MapPost("/master-data/seed", async (MesDbContext db, AuditService audit, ClaimsPrincipal user) =>
         {
             MasterDataSeed.EnsureSeeded(db);
@@ -320,6 +329,8 @@ public static class MasterDataEndpoints
         return read;
     }
 }
+
+// ----- 请求/响应 DTO（API 契约；与实体字段对齐但可裁剪）-----
 
 public record CreateMaterialRequest(string Code, string Name, bool IsFinishedGood, bool IsKeyComponent, bool RequiresSerialNumber);
 public record UpdateMaterialRequest(string? Name, bool IsFinishedGood, bool IsKeyComponent, bool RequiresSerialNumber, bool IsActive);

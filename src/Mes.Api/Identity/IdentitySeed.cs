@@ -2,6 +2,10 @@ using Mes.Api.Data;
 
 namespace Mes.Api.Identity;
 
+/// <summary>
+/// 演示账号种子。幂等：Users 表已有数据则跳过。
+/// 密码仅用于本地/演示，生产必须改密或改种子策略。
+/// </summary>
 public static class IdentitySeed
 {
     public static void EnsureSeeded(MesDbContext db)

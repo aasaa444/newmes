@@ -1,3 +1,9 @@
+/**
+ * 前端 API 薄封装。
+ * - 开发：VITE_API_BASE 指向 ASP.NET（默认 http://localhost:5101）
+ * - Compose：nginx 反代 /api，可留空走同源
+ * Token 存在 localStorage；401 时清会话（需路由守卫配合跳转登录）。
+ */
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
 export function getToken() {

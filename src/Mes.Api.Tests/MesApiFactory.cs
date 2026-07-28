@@ -10,6 +10,11 @@ using Mes.Api.MasterData;
 
 namespace Mes.Api.Tests;
 
+/// <summary>
+/// 集成测试宿主：把真实 API 的 SQL Server 换成 SQLite 内存库。
+/// 环境名 Testing → Program 不注册 SQL Server、不跑 DatabaseBootstrap。
+/// 连接必须 Open 并保持，否则 :memory: 库会随连接关闭而消失。
+/// </summary>
 public class MesApiFactory : WebApplicationFactory<Program>
 {
     private SqliteConnection? _connection;
@@ -20,6 +25,7 @@ public class MesApiFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
+            // 去掉 Program 里可能残留的登记，换成测试库
             services.RemoveAll(typeof(DbContextOptions<MesDbContext>));
             services.RemoveAll(typeof(MesDbContext));
 
@@ -31,6 +37,7 @@ public class MesApiFactory : WebApplicationFactory<Program>
                 options.UseSqlite(_connection);
             });
 
+            // 建表 + 身份/主数据种子（与生产启动等价，但不走删库逻辑）
             var sp = services.BuildServiceProvider();
             using var scope = sp.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<MesDbContext>();

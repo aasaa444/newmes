@@ -77,3 +77,24 @@ docker compose up --build
 | GET | `/api/materials` `/api/boms` `/api/process-routes` `/api/production-lines` `/api/work-stations` | 任意业务角色 |
 | POST/PUT/DELETE | 同上资源（物料完整；BOM/路线/线/工位以 POST 创建为主） | 仅计划员 |
 | POST | `/api/master-data/seed` | 仅计划员 |
+
+## 数据库（LocalDB）
+
+票 01 若已建过只有 `Users` 的 `MesDb`，EF `EnsureCreated` **不会**自动加 `Materials` 等新表，会出现 `Invalid object name 'Materials'`。
+
+**现已处理：** 开发环境启动时 `DatabaseBootstrap` 会探测主数据表；缺失则删库重建并重新种子（仅 Development/Testing）。直接再跑：
+
+```powershell
+dotnet run --project src/Mes.Api
+```
+
+也可手动删库后启动：
+
+```powershell
+sqllocaldb stop MSSQLLocalDB
+sqlcmd -S "(localdb)\MSSQLLocalDB" -Q "DROP DATABASE IF EXISTS MesDb"
+sqllocaldb start MSSQLLocalDB
+dotnet run --project src/Mes.Api
+```
+
+正式试点请改用 EF Migration，避免 `EnsureDeleted`。

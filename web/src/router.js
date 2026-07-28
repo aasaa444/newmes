@@ -1,3 +1,7 @@
+/**
+ * 路由：/login 公开；/plan* 计划端；/station 过站台（大字布局，后续票接业务）。
+ * beforeEach：无 token → 登录；meta.roles 不匹配则按角色兜底跳转。
+ */
 import { createRouter, createWebHistory } from 'vue-router'
 import { getToken, getUser } from './api'
 import LoginView from './views/LoginView.vue'
