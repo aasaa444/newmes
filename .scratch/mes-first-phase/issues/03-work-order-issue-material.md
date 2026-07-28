@@ -4,10 +4,14 @@
 
 **Blocked by:** 02 — 执行主数据与种子数据
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 状态：草稿→已下达→（后续票推进）生产中/已完工/已关闭；取消仅无在制 SN
-- [ ] 下达后路线版本固定；可查询应领与齐套结果
-- [ ] 领料减少线边账并留下工单用料事件
-- [ ] 线边收料（或种子预置库存）足以支持演示领料
-- [ ] 下达/取消/领料可审计
+- [x] 状态：草稿→已下达→（后续票推进）生产中/已完工/已关闭；取消仅无在制 SN
+- [x] 下达后路线版本固定；可查询应领与齐套结果
+- [x] 领料减少线边账并留下工单用料事件
+- [x] 线边收料（或种子预置库存）足以支持演示领料
+- [x] 下达/取消/领料可审计
+
+## Answer
+
+WorkOrder + LineSideInventory + IssueLines; WorkOrderService (release freezes BOM/route, kitting soft shortage, issue deducts line-side; key→Pending, non-key→Consumed). InventorySeed for PCB/PSU/screws. APIs under /api/work-orders* and /api/inventory/line-side*. Plan UI WorkOrdersView. Tests WorkOrderSeamTests 8 + full suite.

@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mes.Api.Data;
+using Mes.Api.Execution;
 using Mes.Api.Identity;
 using Mes.Api.MasterData;
 
@@ -44,6 +45,7 @@ public class MesApiFactory : WebApplicationFactory<Program>
             db.Database.EnsureCreated();
             IdentitySeed.EnsureSeeded(db);
             MasterDataSeed.EnsureSeeded(db);
+            InventorySeed.EnsureSeeded(db);
         });
     }
 

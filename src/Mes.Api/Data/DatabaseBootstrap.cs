@@ -1,3 +1,4 @@
+using Mes.Api.Execution;
 using Mes.Api.Identity;
 using Mes.Api.MasterData;
 using Microsoft.EntityFrameworkCore;
@@ -6,42 +7,42 @@ namespace Mes.Api.Data;
 
 /// <summary>
 /// 开发期数据库启动逻辑。
-/// EF 的 EnsureCreated()：仅当「整个库不存在」时建表；库已存在（例如只跑过票 01）时
-/// 不会自动补 Materials 等新表，因此这里探测主数据表，缺失则在 Development 下删库重建。
-/// 正式试点应改为 Migration，避免 EnsureDeleted。
+/// EF EnsureCreated：库已存在时不补新表；探测 Materials / WorkOrders，缺失则 Development 下重建。
+/// 正式试点应改为 Migration。
 /// </summary>
 public static class DatabaseBootstrap
 {
     public static void Initialize(MesDbContext db, IHostEnvironment env, ILogger logger)
     {
-        // 先尝试按当前模型建库（空实例时会建全表）
         db.Database.EnsureCreated();
 
-        if (!MasterDataTablesExist(db))
+        if (!SchemaLooksCurrent(db))
         {
             if (!env.IsDevelopment() && !env.IsEnvironment("Testing"))
             {
                 throw new InvalidOperationException(
-                    "数据库已存在但缺少主数据表（Materials 等）。请迁移或重建 MesDb。");
+                    "数据库 schema 落后（缺 Materials 或 WorkOrders 等）。请迁移或重建 MesDb。");
             }
 
             logger.LogWarning(
-                "MesDb schema is outdated (missing Materials). Recreating database (Development/Testing only).");
+                "MesDb schema is outdated. Recreating database (Development/Testing only).");
             db.Database.EnsureDeleted();
             db.Database.EnsureCreated();
         }
 
         IdentitySeed.EnsureSeeded(db);
         MasterDataSeed.EnsureSeeded(db);
+        InventorySeed.EnsureSeeded(db);
     }
 
-    /// <summary>探测 Materials 表是否存在（票 02 起的 schema 标志）。</summary>
-    private static bool MasterDataTablesExist(MesDbContext db)
+    /// <summary>票 02+03 的粗粒度 schema 探测。</summary>
+    private static bool SchemaLooksCurrent(MesDbContext db)
     {
         try
         {
-            // 任意轻量查询：表不存在会抛 SqlException 208
             _ = db.Materials.AsNoTracking().Any();
+            _ = db.WorkOrders.AsNoTracking().Any();
+            _ = db.LineSideInventories.AsNoTracking().Any();
             return true;
         }
         catch (Exception ex) when (IsMissingTable(ex))

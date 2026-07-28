@@ -1,3 +1,4 @@
+using Mes.Api.Execution;
 using Mes.Api.Identity;
 using Mes.Api.MasterData;
 using Microsoft.EntityFrameworkCore;
@@ -6,7 +7,7 @@ namespace Mes.Api.Data;
 
 /// <summary>
 /// MES 统一 DbContext（第一期单体）。
-/// 含：身份/审计 + 执行主数据（物料、BOM、工艺路线、产线工位）。
+/// 含：身份/审计 + 执行主数据 + 工单/线边库存（票 03）。
 /// 生产默认 SQL Server；集成测试由 MesApiFactory 换成 SQLite 内存库。
 /// </summary>
 public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(options)
@@ -23,6 +24,11 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
     public DbSet<ProcessStep> ProcessSteps => Set<ProcessStep>();
     public DbSet<ProductionLine> ProductionLines => Set<ProductionLine>();
     public DbSet<WorkStation> WorkStations => Set<WorkStation>();
+
+    // ----- 票 03：工单与线边 -----
+    public DbSet<WorkOrder> WorkOrders => Set<WorkOrder>();
+    public DbSet<WorkOrderIssueLine> WorkOrderIssueLines => Set<WorkOrderIssueLine>();
+    public DbSet<LineSideInventory> LineSideInventories => Set<LineSideInventory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -111,6 +117,46 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
             e.Property(x => x.Code).HasMaxLength(64).IsRequired();
             e.Property(x => x.Name).HasMaxLength(128).IsRequired();
             e.HasOne(x => x.BoundProcessStep).WithMany().HasForeignKey(x => x.BoundProcessStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<WorkOrder>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.OrderNo).IsUnique();
+            e.Property(x => x.OrderNo).HasMaxLength(64).IsRequired();
+            e.Property(x => x.PlannedQty).HasPrecision(18, 4);
+            e.Property(x => x.CompletedQty).HasPrecision(18, 4);
+            e.Property(x => x.ScrappedQty).HasPrecision(18, 4);
+            e.Property(x => x.FrozenRouteVersion).HasMaxLength(16);
+            e.Property(x => x.FrozenBomVersion).HasMaxLength(16);
+            e.HasOne(x => x.FinishedMaterial).WithMany().HasForeignKey(x => x.FinishedMaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.ProcessRoute).WithMany().HasForeignKey(x => x.ProcessRouteId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.Bom).WithMany().HasForeignKey(x => x.BomId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.IssueLines).WithOne(x => x.WorkOrder!).HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<WorkOrderIssueLine>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.IssuedQty).HasPrecision(18, 4);
+            e.Property(x => x.PendingQty).HasPrecision(18, 4);
+            e.Property(x => x.ConsumedQty).HasPrecision(18, 4);
+            e.HasIndex(x => new { x.WorkOrderId, x.MaterialId }).IsUnique();
+            e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<LineSideInventory>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.MaterialId).IsUnique();
+            e.Property(x => x.QuantityOnHand).HasPrecision(18, 4);
+            e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

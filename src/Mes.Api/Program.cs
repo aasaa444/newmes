@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using System.Text;
 using Mes.Api.Data;
+using Mes.Api.Execution;
 using Mes.Api.Identity;
 using Mes.Api.MasterData;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -8,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 
 // =============================================================================
-// MES API 入口（票 01 脚手架 + 票 02 主数据）
+// MES API 入口（票 01 脚手架 + 票 02 主数据 + 票 03 工单/领料）
 // 管道顺序：CORS → Authentication → Authorization → 端点
 // 测试环境（Testing）由 MesApiFactory 换成 SQLite，不会走下面的 SQL Server 注册。
 // =============================================================================
@@ -19,6 +20,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptions.SectionName));
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuditService>(); // 业务审计：谁在何时对何对象做了什么
+builder.Services.AddScoped<WorkOrderService>(); // 工单状态机、齐套、领料
 
 var connectionString = builder.Configuration.GetConnectionString("MesDb")
     ?? "Server=(localdb)\\MSSQLLocalDB;Database=MesDb;Trusted_Connection=True;TrustServerCertificate=True";
@@ -148,6 +150,9 @@ app.MapGet("/api/audit", async (MesDbContext db) =>
 
 // 票 02：物料 / BOM / 工艺路线 / 产线 / 工位
 app.MapMasterDataEndpoints();
+
+// 票 03：生产工单、齐套、领料、线边库存
+app.MapWorkOrderEndpoints();
 
 app.Run();
 
