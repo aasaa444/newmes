@@ -4,10 +4,14 @@
 
 **Blocked by:** 03 — 生产工单生命周期与领料
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 工位上下文固定当前工序；跳站请求被拒绝并提示
-- [ ] 首站过站创建/绑定成品 SN；同一 SN 不挂两张未关闭工单
-- [ ] 关键件绑定进入谱系并按规则记耗
-- [ ] 谱系查询可还原站点与关键件
-- [ ] 过站与绑定可审计；未领料/未齐套策略按配置提示或拦截（默认与 CONTEXT 一致）
+- [x] 工位上下文固定当前工序；跳站请求被拒绝并提示
+- [x] 首站过站创建/绑定成品 SN；同一 SN 不挂两张未关闭工单
+- [x] 关键件绑定进入谱系并按规则记耗
+- [x] 谱系查询可还原站点与关键件
+- [x] 过站与绑定可审计；未领料/未齐套策略按配置提示或拦截（默认与 CONTEXT 一致）
+
+## Answer
+
+ProductSerial, SerialPassRecord, ComponentBinding; StationPassService (first-step create/scan, anti-skip, route advance, key bind Pending→Consumed). APIs: POST /api/station/pass, bind-component, GET genealogy/{sn}, stations/active. Station UI overhaul. Tests StationPassSeamTests 6 green; full suite after.

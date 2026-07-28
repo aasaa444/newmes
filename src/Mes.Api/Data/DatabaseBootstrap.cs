@@ -43,6 +43,7 @@ public static class DatabaseBootstrap
             _ = db.Materials.AsNoTracking().Any();
             _ = db.WorkOrders.AsNoTracking().Any();
             _ = db.LineSideInventories.AsNoTracking().Any();
+            _ = db.ProductSerials.AsNoTracking().Any();
             return true;
         }
         catch (Exception ex) when (IsMissingTable(ex))

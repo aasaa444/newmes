@@ -30,6 +30,11 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
     public DbSet<WorkOrderIssueLine> WorkOrderIssueLines => Set<WorkOrderIssueLine>();
     public DbSet<LineSideInventory> LineSideInventories => Set<LineSideInventory>();
 
+    // ----- 票 04：SN / 过站 / 谱系 -----
+    public DbSet<ProductSerial> ProductSerials => Set<ProductSerial>();
+    public DbSet<SerialPassRecord> SerialPassRecords => Set<SerialPassRecord>();
+    public DbSet<ComponentBinding> ComponentBindings => Set<ComponentBinding>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         // 约束与索引集中在此；业务规则仍在端点/领域服务中。
@@ -157,6 +162,40 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
             e.HasIndex(x => x.MaterialId).IsUnique();
             e.Property(x => x.QuantityOnHand).HasPrecision(18, 4);
             e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductSerial>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.SerialNo).IsUnique();
+            e.Property(x => x.SerialNo).HasMaxLength(64).IsRequired();
+            e.HasOne(x => x.WorkOrder).WithMany().HasForeignKey(x => x.WorkOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasMany(x => x.PassRecords).WithOne(x => x.ProductSerial!).HasForeignKey(x => x.ProductSerialId)
+                .OnDelete(DeleteBehavior.Cascade);
+            e.HasMany(x => x.ComponentBindings).WithOne(x => x.ProductSerial!).HasForeignKey(x => x.ProductSerialId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<SerialPassRecord>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Result).HasMaxLength(16).IsRequired();
+            e.Property(x => x.OperatorUserName).HasMaxLength(64);
+            e.HasOne(x => x.ProcessStep).WithMany().HasForeignKey(x => x.ProcessStepId)
+                .OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(x => x.WorkStation).WithMany().HasForeignKey(x => x.WorkStationId)
+                .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        modelBuilder.Entity<ComponentBinding>(e =>
+        {
+            e.HasKey(x => x.Id);
+            e.HasIndex(x => x.ComponentSerialNo).IsUnique();
+            e.Property(x => x.ComponentSerialNo).HasMaxLength(64).IsRequired();
+            e.Property(x => x.OperatorUserName).HasMaxLength(64);
+            e.HasOne(x => x.ComponentMaterial).WithMany().HasForeignKey(x => x.ComponentMaterialId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

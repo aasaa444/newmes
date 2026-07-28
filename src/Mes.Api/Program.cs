@@ -21,6 +21,7 @@ builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection(JwtOptio
 builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuditService>(); // 业务审计：谁在何时对何对象做了什么
 builder.Services.AddScoped<WorkOrderService>(); // 工单状态机、齐套、领料
+builder.Services.AddScoped<StationPassService>(); // 过站、防跳站、关键件绑定、谱系
 
 var connectionString = builder.Configuration.GetConnectionString("MesDb")
     ?? "Server=(localdb)\\MSSQLLocalDB;Database=MesDb;Trusted_Connection=True;TrustServerCertificate=True";
@@ -153,6 +154,9 @@ app.MapMasterDataEndpoints();
 
 // 票 03：生产工单、齐套、领料、线边库存
 app.MapWorkOrderEndpoints();
+
+// 票 04：过站台、SN、防跳站、谱系
+app.MapStationPassEndpoints();
 
 app.Run();
 
