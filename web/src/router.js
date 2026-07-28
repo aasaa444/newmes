@@ -4,6 +4,7 @@ import LoginView from './views/LoginView.vue'
 import PlanHome from './views/plan/PlanHome.vue'
 import StationHome from './views/station/StationHome.vue'
 import AuditView from './views/plan/AuditView.vue'
+import MasterDataView from './views/plan/MasterDataView.vue'
 
 const routes = [
   { path: '/', redirect: '/login' },
@@ -11,6 +12,11 @@ const routes = [
   {
     path: '/plan',
     component: PlanHome,
+    meta: { roles: ['Planner', 'Leader'] },
+  },
+  {
+    path: '/plan/master-data',
+    component: MasterDataView,
     meta: { roles: ['Planner', 'Leader'] },
   },
   {

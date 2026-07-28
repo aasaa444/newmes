@@ -36,6 +36,7 @@ function logout() {
         <div class="muted">工单 / 主数据 / 追溯（后续票）· 当前为脚手架</div>
       </div>
       <div class="nav">
+        <router-link to="/plan/master-data">执行主数据</router-link>
         <router-link to="/plan/audit">业务审计</router-link>
         <router-link to="/station">过站台</router-link>
         <button class="btn ghost" type="button" @click="logout">退出</button>

@@ -4,10 +4,14 @@
 
 **Blocked by:** 01 — 工程脚手架、身份与交付骨架
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 计划员可 CRUD 物料/BOM/工艺路线/产线/工位
-- [ ] 关键件与采集 SN 标记可配置；工位仅绑定一道工序
-- [ ] 种子数据一键或一命令加载成功
-- [ ] 非计划员无法改主数据（RBAC）
-- [ ] 主数据变更写入业务审计
+- [x] 计划员可 CRUD 物料/BOM/工艺路线/产线/工位
+- [x] 关键件与采集 SN 标记可配置；工位仅绑定一道工序
+- [x] 种子数据一键或一命令加载成功
+- [x] 非计划员无法改主数据（RBAC）
+- [x] 主数据变更写入业务审计
+
+## Answer
+
+Master data domain + `MasterDataSeed` (electronics demo). API under `/api/materials|boms|process-routes|production-lines|work-stations` and `POST /api/master-data/seed`. Planner-only writes; AnyBusinessRole reads. Material PUT/DELETE (soft). Vue plan page lists seed. Tests: MasterDataSeamTests + Auth — 14 green.

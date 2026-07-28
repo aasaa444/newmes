@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Mes.Api.Data;
 using Mes.Api.Identity;
+using Mes.Api.MasterData;
 
 namespace Mes.Api.Tests;
 
@@ -35,6 +36,7 @@ public class MesApiFactory : WebApplicationFactory<Program>
             var db = scope.ServiceProvider.GetRequiredService<MesDbContext>();
             db.Database.EnsureCreated();
             IdentitySeed.EnsureSeeded(db);
+            MasterDataSeed.EnsureSeeded(db);
         });
     }
 

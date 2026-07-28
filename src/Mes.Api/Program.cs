@@ -2,6 +2,7 @@ using System.Security.Claims;
 using System.Text;
 using Mes.Api.Data;
 using Mes.Api.Identity;
+using Mes.Api.MasterData;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -67,6 +68,7 @@ if (!app.Environment.IsEnvironment("Testing"))
     var db = scope.ServiceProvider.GetRequiredService<MesDbContext>();
     db.Database.EnsureCreated();
     IdentitySeed.EnsureSeeded(db);
+    MasterDataSeed.EnsureSeeded(db);
 }
 
 if (app.Environment.IsDevelopment())
@@ -127,6 +129,8 @@ app.MapGet("/api/audit", async (MesDbContext db) =>
     return Results.Ok(items);
 })
 .RequireAuthorization("AnyBusinessRole");
+
+app.MapMasterDataEndpoints();
 
 app.Run();
 

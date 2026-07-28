@@ -59,10 +59,21 @@ docker compose up --build
 
 当前环境若 Docker 引擎未启动，请用 LocalDB 开发路径。
 
-## 票 01 范围
+## 票进度
 
-- [x] API + Vue 壳可启动，`/health`
-- [x] 三角色登录与 JWT；计划区 RBAC（操作工访问 `/api/plan/ping` → 403）
-- [x] BCrypt 密码哈希；未授权 → 401
-- [x] Compose 文件与 Dockerfile
-- [x] 登录写入业务审计，`GET /api/audit`
+### 01 脚手架 / 身份 / 交付
+- [x] API + Vue 壳，`/health`，JWT RBAC，审计，Compose
+
+### 02 执行主数据与种子
+- [x] 物料（关键件 / 采 SN）、单层 BOM、线性工艺路线、产线、工位（绑单工序）
+- [x] 种子：`FG-ROUTER` + PCB/PSU/螺丝 + `RT-ROUTER-A` + `L1` 五工位
+- [x] 计划员写、全角色读；变更审计；`POST /api/master-data/seed`
+- [x] 计划端「执行主数据」只读浏览页
+
+## 主数据 API（摘要）
+
+| 方法 | 路径 | 授权 |
+|------|------|------|
+| GET | `/api/materials` `/api/boms` `/api/process-routes` `/api/production-lines` `/api/work-stations` | 任意业务角色 |
+| POST/PUT/DELETE | 同上资源（物料完整；BOM/路线/线/工位以 POST 创建为主） | 仅计划员 |
+| POST | `/api/master-data/seed` | 仅计划员 |
