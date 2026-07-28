@@ -37,7 +37,7 @@ public class QualitySeamTests : IClassFixture<MesApiFactory>
             serialNo = sn
         });
         passBlocked.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await passBlocked.Content.ReadAsStringAsync()).Should().Contain("isolated");
+        (await passBlocked.Content.ReadAsStringAsync()).Should().Contain("隔离");
 
         var list = await GetAsync<List<IsolatedDto>>("/api/quality/isolated", planner);
         list.Should().Contain(x => x.SerialNo == sn);

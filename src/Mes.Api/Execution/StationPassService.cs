@@ -26,7 +26,7 @@ public class StationPassService(MesDbContext db)
         var station = await db.WorkStations
             .Include(s => s.BoundProcessStep)
             .FirstOrDefaultAsync(s => s.Id == workStationId && s.IsActive, ct)
-            ?? throw new InvalidOperationException("work station not found");
+            ?? throw new InvalidOperationException("未找到该工位");
 
         var stationStep = station.BoundProcessStep
             ?? await db.ProcessSteps.FirstAsync(p => p.Id == station.BoundProcessStepId, ct);
@@ -39,7 +39,7 @@ public class StationPassService(MesDbContext db)
             // 系统发号：必须指定已下达/生产中工单，且工位必须是该路线首序
             if (workOrderId is null)
             {
-                throw new InvalidOperationException("workOrderId required when creating serial by system number");
+                throw new InvalidOperationException("系统发号创建序列号时必须指定生产工单");
             }
 
             var wo = await LoadOpenWorkOrderAsync(workOrderId.Value, ct);
@@ -60,7 +60,7 @@ public class StationPassService(MesDbContext db)
                 // 扫入新码上线
                 if (workOrderId is null)
                 {
-                    throw new InvalidOperationException("workOrderId required to start a new serial");
+                    throw new InvalidOperationException("新开序列号上线时必须指定生产工单");
                 }
 
                 var wo = await LoadOpenWorkOrderAsync(workOrderId.Value, ct);
@@ -77,12 +77,12 @@ public class StationPassService(MesDbContext db)
                 if (serial.Status == ProcessStepStatus.Isolated)
                 {
                     throw new InvalidOperationException(
-                        "serial is isolated; release before pass (cannot complete while isolated)");
+                        "序列号处于隔离中，请先放行再过站（隔离品不能按合格品继续）");
                 }
 
                 if (serial.Status != ProcessStepStatus.InProcess)
                 {
-                    throw new InvalidOperationException($"serial status is {serial.Status}, cannot pass");
+                    throw new InvalidOperationException($"序列号当前状态为 {serial.Status}，不能过站");
                 }
 
                 // 防跳站：工位工序必须等于 SN 当前工序
@@ -93,7 +93,7 @@ public class StationPassService(MesDbContext db)
                         : (await db.ProcessSteps.AsNoTracking()
                             .FirstOrDefaultAsync(p => p.Id == serial.CurrentProcessStepId, ct))?.Code ?? "?";
                     throw new InvalidOperationException(
-                        $"anti-skip: station step is {stationStep.Code}, serial current step is {cur}");
+                        $"防跳站：工位工序为 {stationStep.Code}，序列号当前工序为 {cur}");
                 }
             }
         }
@@ -112,7 +112,7 @@ public class StationPassService(MesDbContext db)
 
         // 前进到下一工序或标记路线完成
         var routeId = serial.WorkOrder!.ProcessRouteId
-            ?? throw new InvalidOperationException("work order has no process route");
+            ?? throw new InvalidOperationException("生产工单未绑定工艺路线");
         var steps = await db.ProcessSteps.AsNoTracking()
             .Where(p => p.ProcessRouteId == routeId)
             .OrderBy(p => p.Sequence)
@@ -121,7 +121,7 @@ public class StationPassService(MesDbContext db)
         var idx = steps.FindIndex(p => p.Id == stationStep.Id);
         if (idx < 0)
         {
-            throw new InvalidOperationException("station step not on work order route");
+            throw new InvalidOperationException("当前工位工序不在本工单的工艺路线上");
         }
 
         if (idx + 1 < steps.Count)
@@ -166,39 +166,39 @@ public class StationPassService(MesDbContext db)
         var serial = await db.ProductSerials
             .Include(s => s.WorkOrder)
             .FirstOrDefaultAsync(s => s.SerialNo == productSerialNo, ct)
-            ?? throw new InvalidOperationException("product serial not found");
+            ?? throw new InvalidOperationException("未找到该成品序列号");
 
         if (serial.Status is ProcessStepStatus.Scrapped)
         {
-            throw new InvalidOperationException("cannot bind to scrapped serial");
+            throw new InvalidOperationException("已报废的序列号不能绑定关键件");
         }
 
         if (serial.Status is ProcessStepStatus.Isolated)
         {
-            throw new InvalidOperationException("cannot bind while isolated; release first");
+            throw new InvalidOperationException("序列号处于隔离中，请先放行再绑定关键件");
         }
 
         var mat = await db.Materials.FirstOrDefaultAsync(m => m.Id == componentMaterialId, ct)
-            ?? throw new InvalidOperationException("component material not found");
+            ?? throw new InvalidOperationException("未找到该组件物料");
 
         if (!mat.IsKeyComponent)
         {
-            throw new InvalidOperationException("material is not a key component");
+            throw new InvalidOperationException("该物料不是关键件，无需绑定序列号");
         }
 
         // 同一关键件 SN 全局不重复绑定
         if (await db.ComponentBindings.AnyAsync(b => b.ComponentSerialNo == componentSerialNo, ct))
         {
-            throw new InvalidOperationException("component serial already bound");
+            throw new InvalidOperationException("该关键件序列号已绑定到其他成品");
         }
 
         var issue = await db.WorkOrderIssueLines
             .FirstOrDefaultAsync(i => i.WorkOrderId == serial.WorkOrderId && i.MaterialId == componentMaterialId, ct)
-            ?? throw new InvalidOperationException("no issued quantity for this component on the work order; issue material first");
+            ?? throw new InvalidOperationException("本工单尚未领用该组件，请先领料再绑定关键件");
 
         if (issue.PendingQty < 1)
         {
-            throw new InvalidOperationException("no pending (unbound) quantity for this key component on the work order");
+            throw new InvalidOperationException("本工单该关键件已无待绑定数量（请先领料或检查是否已全部绑定）");
         }
 
         issue.PendingQty -= 1;
@@ -235,7 +235,7 @@ public class StationPassService(MesDbContext db)
         var serial = await db.ProductSerials.AsNoTracking()
             .Include(s => s.WorkOrder)!.ThenInclude(w => w!.FinishedMaterial)
             .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
-            ?? throw new InvalidOperationException("serial not found");
+            ?? throw new InvalidOperationException("未找到该序列号");
 
         var passes = await db.SerialPassRecords.AsNoTracking()
             .Include(p => p.ProcessStep)
@@ -276,15 +276,15 @@ public class StationPassService(MesDbContext db)
     private async Task<WorkOrder> LoadOpenWorkOrderAsync(Guid id, CancellationToken ct)
     {
         var wo = await db.WorkOrders.FirstOrDefaultAsync(w => w.Id == id, ct)
-            ?? throw new InvalidOperationException("work order not found");
+            ?? throw new InvalidOperationException("未找到该生产工单");
         if (wo.Status is not (WorkOrderStatus.Released or WorkOrderStatus.InProcess))
         {
-            throw new InvalidOperationException("work order must be released or in process");
+            throw new InvalidOperationException("生产工单须为已下达或生产中");
         }
 
         if (wo.ProcessRouteId is null)
         {
-            throw new InvalidOperationException("work order has no frozen route");
+            throw new InvalidOperationException("生产工单未冻结工艺路线，请先下达");
         }
 
         return wo;
@@ -299,7 +299,7 @@ public class StationPassService(MesDbContext db)
         if (first.Id != stationStep.Id)
         {
             throw new InvalidOperationException(
-                $"new serial must start at first step {first.Code}, station is {stationStep.Code}");
+                $"新序列号必须从首道工序 {first.Code} 上线，当前工位为 {stationStep.Code}");
         }
     }
 
@@ -313,7 +313,7 @@ public class StationPassService(MesDbContext db)
         var st = existing.WorkOrder!.Status;
         if (st is not (WorkOrderStatus.Closed or WorkOrderStatus.Cancelled))
         {
-            throw new InvalidOperationException("serial already linked to an open work order");
+            throw new InvalidOperationException("该序列号已挂在未关闭的生产工单上");
         }
     }
 

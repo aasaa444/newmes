@@ -60,7 +60,7 @@ public class CompletionSeamTests : IClassFixture<MesApiFactory>
         // 即使强行走完路线也不该——隔离态直接拦入库
         var res = await SendAsync(HttpMethod.Post, "/api/completion/receive", op, new { serialNo = sn });
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await res.Content.ReadAsStringAsync()).Should().Contain("isolated");
+        (await res.Content.ReadAsStringAsync()).Should().Contain("隔离");
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class CompletionSeamTests : IClassFixture<MesApiFactory>
 
         var issueRes = await SendAsync(HttpMethod.Post, $"/api/work-orders/{woId}/issue", planner, new { });
         issueRes.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-        (await issueRes.Content.ReadAsStringAsync()).Should().Contain("closed");
+        (await issueRes.Content.ReadAsStringAsync()).Should().Contain("关闭");
     }
 
     [Fact]

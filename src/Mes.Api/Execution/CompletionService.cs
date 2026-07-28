@@ -20,27 +20,27 @@ public class CompletionService(MesDbContext db, ErpWritebackSimulator erp)
         var serial = await db.ProductSerials
             .Include(s => s.WorkOrder)!.ThenInclude(w => w!.FinishedMaterial)
             .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
-            ?? throw new InvalidOperationException("product serial not found");
+            ?? throw new InvalidOperationException("未找到该成品序列号");
 
         if (serial.Status == ProcessStepStatus.Isolated)
         {
-            throw new InvalidOperationException("isolated serial cannot enter finished goods; release or scrap first");
+            throw new InvalidOperationException("隔离中的序列号不能入成品仓，请先放行或报废");
         }
 
         if (serial.Status == ProcessStepStatus.Scrapped)
         {
-            throw new InvalidOperationException("scrapped serial cannot enter finished goods");
+            throw new InvalidOperationException("已报废的序列号不能入成品仓");
         }
 
         if (serial.Status == ProcessStepStatus.Completed)
         {
-            throw new InvalidOperationException("serial already completed to finished goods");
+            throw new InvalidOperationException("该序列号已完工入库");
         }
 
         if (serial.Status != ProcessStepStatus.RouteCompleted)
         {
             throw new InvalidOperationException(
-                $"serial must be RouteCompleted to warehouse, current is {serial.Status}");
+                $"只有路线完成的序列号才能完工入库，当前状态为 {serial.Status}");
         }
 
         var wo = await db.WorkOrders
@@ -49,7 +49,7 @@ public class CompletionService(MesDbContext db, ErpWritebackSimulator erp)
 
         if (wo.Status is WorkOrderStatus.Closed or WorkOrderStatus.Cancelled)
         {
-            throw new InvalidOperationException("work order is closed or cancelled");
+            throw new InvalidOperationException("生产工单已关闭或已取消");
         }
 
         // 成品账 +1
@@ -133,21 +133,21 @@ public class CompletionService(MesDbContext db, ErpWritebackSimulator erp)
     public async Task CloseAsync(Guid workOrderId, CancellationToken ct = default)
     {
         var wo = await db.WorkOrders.FirstOrDefaultAsync(w => w.Id == workOrderId, ct)
-            ?? throw new InvalidOperationException("work order not found");
+            ?? throw new InvalidOperationException("未找到该生产工单");
 
         if (wo.Status == WorkOrderStatus.Closed)
         {
-            throw new InvalidOperationException("already closed");
+            throw new InvalidOperationException("工单已关闭");
         }
 
         if (wo.Status == WorkOrderStatus.Cancelled)
         {
-            throw new InvalidOperationException("cancelled orders are not closed via this API");
+            throw new InvalidOperationException("已取消的工单无需再关闭");
         }
 
         if (wo.InProcessSerialCount > 0)
         {
-            throw new InvalidOperationException("cannot close while in-process serials remain");
+            throw new InvalidOperationException("仍有在制序列号，不能关闭工单");
         }
 
         // 允许：已完工，或 Released/InProcess 但已无在制且完工+报废已覆盖计划
@@ -155,7 +155,7 @@ public class CompletionService(MesDbContext db, ErpWritebackSimulator erp)
         if (wo.Status != WorkOrderStatus.Completed && !covered)
         {
             throw new InvalidOperationException(
-                "close requires Completed status or completed+scrapped covering planned qty");
+                "关闭工单要求：已完工，或合格完工数+报废数已覆盖计划数量");
         }
 
         wo.Status = WorkOrderStatus.Closed;

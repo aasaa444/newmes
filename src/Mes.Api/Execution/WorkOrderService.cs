@@ -22,12 +22,12 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
     {
         if (plannedQty <= 0)
         {
-            throw new InvalidOperationException("plannedQty must be positive");
+            throw new InvalidOperationException("计划数量必须大于 0");
         }
 
         var fg = await db.Materials.FirstOrDefaultAsync(
             m => m.Id == finishedMaterialId && m.IsFinishedGood && m.IsActive, ct)
-            ?? throw new InvalidOperationException("finished material not found or not a finished good");
+            ?? throw new InvalidOperationException("未找到成品物料，或该物料不是成品");
 
         // 默认取该成品当前有效 BOM / 路线
         var bom = bomId.HasValue
@@ -50,7 +50,7 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
 
         if (await db.WorkOrders.AnyAsync(w => w.OrderNo == no, ct))
         {
-            throw new InvalidOperationException("order number already exists");
+            throw new InvalidOperationException("工单号已存在");
         }
 
         var wo = new WorkOrder
@@ -75,7 +75,7 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
         var wo = await LoadWoAsync(workOrderId, ct);
         if (wo.Status != WorkOrderStatus.Draft)
         {
-            throw new InvalidOperationException("only draft work orders can be released");
+            throw new InvalidOperationException("仅草稿状态的工单可以下达");
         }
 
         var bom = wo.BomId.HasValue
@@ -90,7 +90,7 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
 
         if (bom is null || route is null)
         {
-            throw new InvalidOperationException("BOM and process route are required to release");
+            throw new InvalidOperationException("下达工单需要有效的 BOM 与工艺路线");
         }
 
         wo.BomId = bom.Id;
@@ -108,12 +108,12 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
         var wo = await LoadWoAsync(workOrderId, ct);
         if (wo.Status is not (WorkOrderStatus.Draft or WorkOrderStatus.Released))
         {
-            throw new InvalidOperationException("only draft or released orders can be cancelled");
+            throw new InvalidOperationException("仅草稿或已下达的工单可以取消");
         }
 
         if (wo.InProcessSerialCount > 0)
         {
-            throw new InvalidOperationException("cannot cancel while in-process serials exist");
+            throw new InvalidOperationException("仍有在制序列号，不能取消工单");
         }
 
         wo.Status = WorkOrderStatus.Cancelled;
@@ -126,11 +126,11 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
     public async Task<KittingResult> GetKittingAsync(Guid workOrderId, CancellationToken ct = default)
     {
         var wo = await db.WorkOrders.AsNoTracking().FirstOrDefaultAsync(w => w.Id == workOrderId, ct)
-            ?? throw new InvalidOperationException("work order not found");
+            ?? throw new InvalidOperationException("未找到该生产工单");
 
         if (wo.BomId is null)
         {
-            throw new InvalidOperationException("work order has no BOM; release first or assign BOM");
+            throw new InvalidOperationException("工单尚无 BOM，请先下达或指定 BOM");
         }
 
         var bom = await db.Boms.AsNoTracking()
@@ -177,12 +177,12 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
         var wo = await LoadWoAsync(workOrderId, ct);
         if (wo.Status is not (WorkOrderStatus.Released or WorkOrderStatus.InProcess))
         {
-            throw new InvalidOperationException("issue only allowed on released or in-process orders");
+            throw new InvalidOperationException("仅已下达或生产中的工单可以领料");
         }
 
         if (wo.BomId is null)
         {
-            throw new InvalidOperationException("BOM required");
+            throw new InvalidOperationException("需要 BOM 才能领料");
         }
 
         var bom = await db.Boms
@@ -197,7 +197,7 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
             {
                 if (line.Quantity <= 0) continue;
                 var mat = await db.Materials.FirstOrDefaultAsync(m => m.Id == line.MaterialId, ct)
-                    ?? throw new InvalidOperationException($"material {line.MaterialId} not found");
+                    ?? throw new InvalidOperationException($"未找到物料 {line.MaterialId}");
                 toIssue.Add((mat.Id, line.Quantity, mat));
             }
         }
@@ -222,7 +222,7 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
             if (inv is null || inv.QuantityOnHand < qty)
             {
                 throw new InvalidOperationException(
-                    $"insufficient line-side stock for {mat.Code}: need {qty}, have {inv?.QuantityOnHand ?? 0}");
+                    $"线边库存不足：{mat.Code} 需要 {qty}，当前 {inv?.QuantityOnHand ?? 0}");
             }
 
             inv.QuantityOnHand -= qty;
@@ -267,9 +267,9 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
     /// <summary>线边收料（计划员补库存）。</summary>
     public async Task<LineSideInventory> ReceiveLineSideAsync(Guid materialId, decimal qty, CancellationToken ct = default)
     {
-        if (qty <= 0) throw new InvalidOperationException("quantity must be positive");
+        if (qty <= 0) throw new InvalidOperationException("数量必须大于 0");
         _ = await db.Materials.FirstOrDefaultAsync(m => m.Id == materialId, ct)
-            ?? throw new InvalidOperationException("material not found");
+            ?? throw new InvalidOperationException("未找到该物料");
 
         var inv = await db.LineSideInventories.FirstOrDefaultAsync(i => i.MaterialId == materialId, ct);
         if (inv is null)
@@ -286,10 +286,10 @@ public class WorkOrderService(MesDbContext db, ErpWritebackSimulator erp)
     private async Task<WorkOrder> LoadWoAsync(Guid id, CancellationToken ct)
     {
         var wo = await db.WorkOrders.Include(w => w.IssueLines).FirstOrDefaultAsync(w => w.Id == id, ct)
-            ?? throw new InvalidOperationException("work order not found");
+            ?? throw new InvalidOperationException("未找到该生产工单");
         if (wo.Status == WorkOrderStatus.Closed)
         {
-            throw new InvalidOperationException("work order is closed (read-only)");
+            throw new InvalidOperationException("生产工单已关闭，不可再修改");
         }
 
         return wo;

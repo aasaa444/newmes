@@ -131,3 +131,8 @@ dotnet run --project src/Mes.Api
 ```
 
 正式试点请改用 EF Migration，避免 `EnsureDeleted`。
+
+## 用户可见错误文案
+
+业务异常（过站、领料、绑定、质量、入库等）通过 API 的 `error` 字段返回**中文**提示，便于产线与演示。  
+审计动作码、ERP 报文类型等系统标识仍为英文（如 `StationPass`、`MaterialIssue`）。

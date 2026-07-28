@@ -64,7 +64,7 @@ public class StationPassSeamTests : IClassFixture<MesApiFactory>
         });
         res.StatusCode.Should().Be(HttpStatusCode.BadRequest);
         var body = await res.Content.ReadAsStringAsync();
-        body.Should().Contain("anti-skip");
+        body.Should().Contain("防跳站");
 
         // 正确在 FLASH 过站
         var ok = await PostOkAsync<SerialDto>("/api/station/pass", op, new

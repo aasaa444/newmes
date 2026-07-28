@@ -28,14 +28,14 @@ public class QualityService(MesDbContext db)
         disposition = disposition.Trim();
         if (disposition is not ("Rework" or "Isolate" or "Scrap"))
         {
-            throw new InvalidOperationException("disposition must be Rework, Isolate, or Scrap");
+            throw new InvalidOperationException("不合格处置须为：返工、隔离或报废");
         }
 
         serialNo = serialNo.Trim().ToUpperInvariant();
         var station = await db.WorkStations
             .Include(s => s.BoundProcessStep)
             .FirstOrDefaultAsync(s => s.Id == workStationId && s.IsActive, ct)
-            ?? throw new InvalidOperationException("work station not found");
+            ?? throw new InvalidOperationException("未找到该工位");
 
         var stationStep = station.BoundProcessStep
             ?? await db.ProcessSteps.FirstAsync(p => p.Id == station.BoundProcessStepId, ct);
@@ -43,23 +43,23 @@ public class QualityService(MesDbContext db)
         var serial = await db.ProductSerials
             .Include(s => s.WorkOrder)
             .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
-            ?? throw new InvalidOperationException("product serial not found");
+            ?? throw new InvalidOperationException("未找到该成品序列号");
 
         if (serial.Status is ProcessStepStatus.Scrapped)
         {
-            throw new InvalidOperationException("serial already scrapped");
+            throw new InvalidOperationException("该序列号已报废");
         }
 
         if (serial.Status is ProcessStepStatus.Isolated)
         {
-            throw new InvalidOperationException("serial is isolated; release before further fail actions, or scrap via scrap API");
+            throw new InvalidOperationException("序列号处于隔离中：请先放行后再处理，或直接报废");
         }
 
         // 路线已完成：仅允许隔离/报废（例如终检后发现异常），不要求防跳站
         var routeDone = serial.Status == ProcessStepStatus.RouteCompleted;
         if (routeDone && disposition is "Rework")
         {
-            throw new InvalidOperationException("cannot rework a route-completed serial; isolate or scrap");
+            throw new InvalidOperationException("路线已完成的序列号不能返工，请隔离或报废");
         }
 
         if (!routeDone)
@@ -72,12 +72,12 @@ public class QualityService(MesDbContext db)
                     : (await db.ProcessSteps.AsNoTracking()
                         .FirstOrDefaultAsync(p => p.Id == serial.CurrentProcessStepId, ct))?.Code ?? "?";
                 throw new InvalidOperationException(
-                    $"anti-skip: station step is {stationStep.Code}, serial current step is {cur}");
+                    $"防跳站：工位工序为 {stationStep.Code}，序列号当前工序为 {cur}");
             }
         }
         else if (serial.Status is not (ProcessStepStatus.InProcess or ProcessStepStatus.RouteCompleted))
         {
-            throw new InvalidOperationException($"serial status is {serial.Status}, cannot fail");
+            throw new InvalidOperationException($"序列号当前状态为 {serial.Status}，不能做不合格处理");
         }
 
         var remark = string.IsNullOrWhiteSpace(reason) ? disposition : $"{disposition}: {reason.Trim()}";
@@ -160,29 +160,29 @@ public class QualityService(MesDbContext db)
     {
         if (string.IsNullOrWhiteSpace(reason))
         {
-            throw new InvalidOperationException("release reason is required");
+            throw new InvalidOperationException("放行必须填写原因");
         }
 
         serialNo = serialNo.Trim().ToUpperInvariant();
         var serial = await db.ProductSerials
             .Include(s => s.WorkOrder)
             .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
-            ?? throw new InvalidOperationException("product serial not found");
+            ?? throw new InvalidOperationException("未找到该成品序列号");
 
         if (serial.Status != ProcessStepStatus.Isolated)
         {
-            throw new InvalidOperationException("only isolated serials can be released");
+            throw new InvalidOperationException("仅隔离中的序列号可以放行");
         }
 
         var routeId = serial.WorkOrder!.ProcessRouteId
-            ?? throw new InvalidOperationException("work order has no process route");
+            ?? throw new InvalidOperationException("生产工单未绑定工艺路线");
 
         ProcessStep? targetStep = null;
         if (returnToSequence is int seq)
         {
             targetStep = await db.ProcessSteps
                 .FirstOrDefaultAsync(p => p.ProcessRouteId == routeId && p.Sequence == seq, ct)
-                ?? throw new InvalidOperationException($"no process step with sequence {seq} on route");
+                ?? throw new InvalidOperationException($"工艺路线上不存在顺序号为 {seq} 的工序");
             serial.CurrentProcessStepId = targetStep.Id;
         }
         else if (serial.CurrentProcessStepId is null)
@@ -230,11 +230,11 @@ public class QualityService(MesDbContext db)
         var serial = await db.ProductSerials
             .Include(s => s.WorkOrder)
             .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct)
-            ?? throw new InvalidOperationException("product serial not found");
+            ?? throw new InvalidOperationException("未找到该成品序列号");
 
         if (serial.Status == ProcessStepStatus.Scrapped)
         {
-            throw new InvalidOperationException("serial already scrapped");
+            throw new InvalidOperationException("该序列号已报废");
         }
 
         Guid stepId = serial.CurrentProcessStepId
@@ -260,12 +260,12 @@ public class QualityService(MesDbContext db)
         CancellationToken ct)
     {
         var routeId = serial.WorkOrder!.ProcessRouteId
-            ?? throw new InvalidOperationException("work order has no process route");
+            ?? throw new InvalidOperationException("生产工单未绑定工艺路线");
 
         var targetSeq = reworkToSequence ?? failStep.ReworkToSequence ?? failStep.Sequence;
         var target = await db.ProcessSteps
             .FirstOrDefaultAsync(p => p.ProcessRouteId == routeId && p.Sequence == targetSeq, ct)
-            ?? throw new InvalidOperationException($"rework target sequence {targetSeq} not found on route");
+            ?? throw new InvalidOperationException($"返工目标顺序号 {targetSeq} 在工艺路线上不存在");
 
         serial.CurrentProcessStepId = target.Id;
         serial.Status = ProcessStepStatus.InProcess;

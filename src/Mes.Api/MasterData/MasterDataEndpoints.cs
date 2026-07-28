@@ -33,13 +33,13 @@ public static class MasterDataEndpoints
         {
             if (string.IsNullOrWhiteSpace(req.Code) || string.IsNullOrWhiteSpace(req.Name))
             {
-                return Results.BadRequest(new { error = "code and name are required" });
+                return Results.BadRequest(new { error = "编码与名称不能为空" });
             }
 
             var code = req.Code.Trim().ToUpperInvariant();
             if (await db.Materials.AnyAsync(m => m.Code == code))
             {
-                return Results.Conflict(new { error = "material code already exists" });
+                return Results.Conflict(new { error = "物料编码已存在" });
             }
 
             var entity = new Material
@@ -116,19 +116,19 @@ public static class MasterDataEndpoints
             var fg = await db.Materials.FirstOrDefaultAsync(m => m.Id == req.FinishedMaterialId && m.IsFinishedGood);
             if (fg is null)
             {
-                return Results.BadRequest(new { error = "finishedMaterialId must reference an active finished good" });
+                return Results.BadRequest(new { error = "成品物料无效或不是启用中的成品" });
             }
 
             if (req.Lines is null || req.Lines.Count == 0)
             {
-                return Results.BadRequest(new { error = "BOM requires at least one line" });
+                return Results.BadRequest(new { error = "BOM 至少需要一行组件" });
             }
 
             var componentIds = req.Lines.Select(l => l.ComponentMaterialId).ToList();
             var components = await db.Materials.Where(m => componentIds.Contains(m.Id)).ToListAsync();
             if (components.Count != componentIds.Distinct().Count())
             {
-                return Results.BadRequest(new { error = "one or more component materials not found" });
+                return Results.BadRequest(new { error = "存在未找到的组件物料" });
             }
 
             var bom = new Bom
@@ -186,18 +186,18 @@ public static class MasterDataEndpoints
             var fg = await db.Materials.FirstOrDefaultAsync(m => m.Id == req.FinishedMaterialId && m.IsFinishedGood);
             if (fg is null)
             {
-                return Results.BadRequest(new { error = "finishedMaterialId must be a finished good" });
+                return Results.BadRequest(new { error = "必须指定成品物料" });
             }
 
             if (req.Steps is null || req.Steps.Count == 0)
             {
-                return Results.BadRequest(new { error = "route requires steps" });
+                return Results.BadRequest(new { error = "工艺路线至少需要一道工序" });
             }
 
             var code = req.Code.Trim().ToUpperInvariant();
             if (await db.ProcessRoutes.AnyAsync(r => r.Code == code))
             {
-                return Results.Conflict(new { error = "route code exists" });
+                return Results.Conflict(new { error = "工艺路线编码已存在" });
             }
 
             var route = new ProcessRoute
@@ -248,7 +248,7 @@ public static class MasterDataEndpoints
             var code = req.Code.Trim().ToUpperInvariant();
             if (await db.ProductionLines.AnyAsync(l => l.Code == code))
             {
-                return Results.Conflict(new { error = "line code exists" });
+                return Results.Conflict(new { error = "产线编码已存在" });
             }
 
             var line = new ProductionLine
@@ -286,19 +286,19 @@ public static class MasterDataEndpoints
             var line = await db.ProductionLines.FirstOrDefaultAsync(l => l.Id == req.ProductionLineId);
             if (line is null)
             {
-                return Results.BadRequest(new { error = "productionLineId not found" });
+                return Results.BadRequest(new { error = "未找到该产线" });
             }
 
             var step = await db.ProcessSteps.FirstOrDefaultAsync(s => s.Id == req.BoundProcessStepId);
             if (step is null)
             {
-                return Results.BadRequest(new { error = "boundProcessStepId not found — station must bind exactly one process step" });
+                return Results.BadRequest(new { error = "未找到绑定工序：每个工位必须绑定恰好一道工序" });
             }
 
             var code = req.Code.Trim().ToUpperInvariant();
             if (await db.WorkStations.AnyAsync(s => s.Code == code))
             {
-                return Results.Conflict(new { error = "station code exists" });
+                return Results.Conflict(new { error = "工位编码已存在" });
             }
 
             var station = new WorkStation
