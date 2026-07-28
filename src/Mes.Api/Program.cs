@@ -179,6 +179,26 @@ app.MapGet("/api/me", async (ClaimsPrincipal principal, MesDbContext db) =>
 })
 .RequireAuthorization("AnyBusinessRole");
 
+// 二期票 02：管理端侧栏菜单（按角色裁剪）
+app.MapGet("/api/nav/management", async (ClaimsPrincipal principal, MesDbContext db) =>
+{
+    var userName = principal.Identity?.Name ?? principal.FindFirstValue(ClaimTypes.Name) ?? "";
+    var account = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserName == userName && u.IsActive);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var landing = RoleAccess.ForUser(account);
+    var menus = ManagementNav.ForUser(account);
+    return Results.Ok(new
+    {
+        shell = landing.DefaultShell,
+        menus
+    });
+})
+.RequireAuthorization("AnyBusinessRole");
+
 // 脚手架探测：仅计划员 / 工位相关角色
 app.MapGet("/api/plan/ping", () => Results.Ok(new { ok = true, area = "plan" }))
     .RequireAuthorization("PlannerOnly");

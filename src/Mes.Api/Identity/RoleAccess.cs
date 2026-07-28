@@ -11,7 +11,7 @@ public static class RoleAccess
     /// <summary>前端路由提示（二期壳就绪前管理端暂用 /plan*）。</summary>
     public const string PathOpsOverview = "/plan"; // 票 03 再落到总览专用路由
     public const string PathWorkOrders = "/plan/work-orders";
-    public const string PathWip = "/plan/work-orders"; // 票 05 再落到在制专用路由；暂与工单同区
+    public const string PathWip = "/plan/wip";
     public const string PathStation = "/station";
 
     public static LandingProfile ForUser(UserAccount user)

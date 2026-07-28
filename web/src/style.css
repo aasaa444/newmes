@@ -161,3 +161,121 @@ input {
   color: #99f6e4;
   font-size: 0.8rem;
 }
+
+/* === 管理端经典壳（侧栏 + 顶栏）=== */
+.mgmt-root {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+}
+.mgmt-sidebar {
+  background: rgba(8, 14, 28, 0.95);
+  border-right: 1px solid rgba(148, 163, 184, 0.18);
+  display: flex;
+  flex-direction: column;
+}
+.mgmt-brand {
+  padding: 1.1rem 1rem 0.8rem;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+}
+.mgmt-brand .brand {
+  font-size: 1.1rem;
+}
+.mgmt-nav {
+  flex: 1;
+  padding: 0.5rem 0.4rem;
+  overflow-y: auto;
+}
+.mgmt-nav .nav-link {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.92rem;
+  margin-bottom: 2px;
+}
+.mgmt-nav .nav-link:hover {
+  background: rgba(45, 212, 191, 0.08);
+  color: #ecfeff;
+}
+.mgmt-nav .nav-link.active {
+  background: rgba(15, 118, 110, 0.35);
+  color: #fff;
+  font-weight: 600;
+}
+.mgmt-nav .nav-group-title {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  background: transparent;
+  border: 0;
+  color: #cbd5e1;
+  cursor: pointer;
+  font-size: 0.92rem;
+  border-radius: 8px;
+}
+.mgmt-nav .nav-group-title:hover {
+  background: rgba(45, 212, 191, 0.06);
+  color: #ecfeff;
+}
+.mgmt-nav .nav-children {
+  margin-left: 0.5rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.15);
+  padding-left: 0.25rem;
+  margin-bottom: 0.4rem;
+}
+.mgmt-nav .nav-children .nav-link {
+  padding: 0.4rem 0.6rem;
+  font-size: 0.88rem;
+}
+.mgmt-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.mgmt-topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1.5rem;
+  background: rgba(15, 23, 42, 0.65);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+  backdrop-filter: blur(8px);
+}
+.mgmt-crumb {
+  font-size: 0.95rem;
+  color: #cbd5e1;
+}
+.mgmt-crumb .muted {
+  margin: 0 0.25rem;
+}
+.mgmt-top-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.mgmt-top-actions .muted {
+  color: #94a3b8;
+  font-size: 0.88rem;
+}
+.mgmt-content {
+  flex: 1;
+  padding: 1.25rem 1.5rem 2rem;
+  max-width: 1200px;
+  width: 100%;
+  box-sizing: border-box;
+}
+.page-title {
+  margin: 0 0 0.25rem 0;
+  font-size: 1.5rem;
+  letter-spacing: 0.01em;
+}
+.page-sub {
+  margin: 0 0 1rem 0;
+  color: #94a3b8;
+}

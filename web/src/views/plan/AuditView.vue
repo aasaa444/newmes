@@ -1,9 +1,8 @@
 <script setup>
+/** 业务审计（壳内：操作者行为） */
 import { onMounted, ref } from 'vue'
-import { api, clearSession } from '../../api'
-import { useRouter } from 'vue-router'
+import { api } from '../../api'
 
-const router = useRouter()
 const rows = ref([])
 const error = ref('')
 
@@ -15,25 +14,10 @@ onMounted(async () => {
   }
   rows.value = await res.json()
 })
-
-function logout() {
-  clearSession()
-  router.push('/login')
-}
 </script>
 
 <template>
-  <div class="shell">
-    <div class="topbar">
-      <div>
-        <div class="brand">业务审计</div>
-        <div class="muted">记录操作者行为（与产品谱系分离）</div>
-      </div>
-      <div class="nav">
-        <router-link to="/plan">计划端</router-link>
-        <button class="btn ghost" type="button" @click="logout">退出</button>
-      </div>
-    </div>
+  <div>
     <div class="card">
       <p v-if="error" class="error">{{ error }}</p>
       <table v-else class="table">

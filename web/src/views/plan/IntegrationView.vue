@@ -1,23 +1,17 @@
 <script setup>
-/**
- * 计划端 — 业务审计 + ERP 出站报文（票 06）。
- */
+/** 集成页（壳内）：ERP 出站 + 业务审计 */
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { api, clearSession } from '../../api'
+import { api } from '../../api'
 
-const router = useRouter()
 const audits = ref([])
 const outbox = ref([])
-const fg = ref([])
 const error = ref('')
 const selectedPayload = ref('')
 
 onMounted(async () => {
-  const [a, o, f] = await Promise.all([
+  const [a, o] = await Promise.all([
     api('/api/audit'),
     api('/api/erp/outbox'),
-    api('/api/inventory/finished-goods'),
   ])
   if (!a.ok || !o.ok) {
     error.value = '加载集成/审计失败'
@@ -25,55 +19,16 @@ onMounted(async () => {
   }
   audits.value = await a.json()
   outbox.value = await o.json()
-  if (f.ok) fg.value = await f.json()
 })
 
 function showPayload(row) {
   selectedPayload.value = row.payloadJson
 }
-
-function logout() {
-  clearSession()
-  router.push('/login')
-}
 </script>
 
 <template>
-  <div class="shell">
-    <div class="topbar">
-      <div>
-        <div class="brand">集成与审计</div>
-        <div class="muted">ERP 出站模拟 · 业务审计 · 成品仓</div>
-      </div>
-      <div class="nav">
-        <router-link to="/plan">计划端</router-link>
-        <router-link to="/plan/work-orders">工单</router-link>
-        <button class="btn ghost" type="button" @click="logout">退出</button>
-      </div>
-    </div>
-
+  <div>
     <p v-if="error" class="error">{{ error }}</p>
-
-    <div class="card" style="margin-bottom: 1rem">
-      <h3 style="margin-top: 0">成品库存</h3>
-      <table class="table">
-        <thead>
-          <tr>
-            <th>物料</th>
-            <th>名称</th>
-            <th>数量</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="r in fg" :key="r.materialId">
-            <td>{{ r.materialCode }}</td>
-            <td>{{ r.materialName }}</td>
-            <td>{{ r.quantityOnHand }}</td>
-          </tr>
-        </tbody>
-      </table>
-      <p v-if="!fg.length" class="muted">暂无成品入库</p>
-    </div>
 
     <div class="card" style="margin-bottom: 1rem">
       <h3 style="margin-top: 0">ERP 出站（模拟）</h3>

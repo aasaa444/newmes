@@ -53,7 +53,7 @@ export function resolveHomePath(user) {
   if (user.role === 'Operator') return '/station'
   if (user.role === 'Owner') return '/plan'
   if (user.role === 'Planner') return '/plan/work-orders'
-  if (user.role === 'Leader') return '/plan/work-orders'
+  if (user.role === 'Leader') return '/plan/wip'
   return '/plan'
 }
 

@@ -4,10 +4,8 @@
  * 列表展示「领料」状态，避免点过齐套领料后看不出来。
  */
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { api, clearSession, getUser } from '../../api'
+import { api, getUser } from '../../api'
 
-const router = useRouter()
 const user = getUser()
 const orders = ref([])
 const inventory = ref([])
@@ -163,27 +161,10 @@ async function closeOrder(id) {
   message.value = '工单已关闭'
   await load()
 }
-
-function logout() {
-  clearSession()
-  router.push('/login')
-}
 </script>
 
 <template>
-  <div class="shell">
-    <div class="topbar">
-      <div>
-        <div class="brand">生产工单</div>
-        <div class="muted">草稿 → 下达 → 领料 · {{ user?.displayName }}</div>
-      </div>
-      <div class="nav">
-        <router-link to="/plan">计划端</router-link>
-        <router-link to="/plan/master-data">主数据</router-link>
-        <button class="btn ghost" type="button" @click="logout">退出</button>
-      </div>
-    </div>
-
+  <div>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-if="message" class="ok-msg">{{ message }}</p>
 

@@ -1,9 +1,8 @@
 <script setup>
+/** 主数据浏览（壳内：物料 / BOM / 工艺路线 / 工位） */
 import { onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { api, clearSession } from '../../api'
+import { api } from '../../api'
 
-const router = useRouter()
 const materials = ref([])
 const boms = ref([])
 const routes = ref([])
@@ -31,27 +30,10 @@ onMounted(async () => {
     loading.value = false
   }
 })
-
-function logout() {
-  clearSession()
-  router.push('/login')
-}
 </script>
 
 <template>
-  <div class="shell">
-    <div class="topbar">
-      <div>
-        <div class="brand">执行主数据</div>
-        <div class="muted">物料 · 单层 BOM · 工艺路线 · 工位（种子：FG-ROUTER）</div>
-      </div>
-      <div class="nav">
-        <router-link to="/plan">计划端</router-link>
-        <router-link to="/plan/audit">审计</router-link>
-        <button class="btn ghost" type="button" @click="logout">退出</button>
-      </div>
-    </div>
-
+  <div>
     <p v-if="error" class="error">{{ error }}</p>
     <p v-else-if="loading" class="muted">加载中…</p>
     <template v-else>

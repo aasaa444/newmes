@@ -4,10 +4,14 @@
 
 **Blocked by:** 01 — 经营者角色 + 登录默认落地 + 能力声明
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 管理端任意获权角色可见统一侧栏与顶栏
-- [ ] 五席顺序与名称符合二期约定；无权限菜单不展示或不可进
-- [ ] 顶栏可切换至过站端（仅权限允许的角色）
-- [ ] 原计划端页面在壳内可到达，无「孤儿散页」作为主路径
-- [ ] 操作工默认不进入管理端迷宫（与落地约定一致）
+- [x] 管理端任意获权角色可见统一侧栏与顶栏
+- [x] 五席顺序与名称符合二期约定；无权限菜单不展示或不可进
+- [x] 顶栏可切换至过站端（仅权限允许的角色）
+- [x] 原计划端页面在壳内可到达，无「孤儿散页」作为主路径
+- [x] 操作工默认不进入管理端迷宫（与落地约定一致）
+
+## Answer
+
+ManagementLayout (sidebar + topbar + content); nav endpoint /api/nav/management by role; existing plan pages moved under /plan children; deleted PlanHome.vue (replaced by OpsOverviewView). 55/55 tests green.
