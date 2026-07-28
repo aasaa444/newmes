@@ -75,6 +75,29 @@ public class WorkOrderSeamTests : IClassFixture<MesApiFactory>
     }
 
     [Fact]
+    public async Task List_shows_material_issued_flag_after_issue()
+    {
+        var token = await LoginAsync("planner", "Planner@123");
+        var fgId = await FinishedGoodIdAsync(token);
+        var wo = await PostJsonAsync<WoSummary>("/api/work-orders", token, new
+        {
+            finishedMaterialId = fgId,
+            plannedQty = 2
+        });
+        await PostJsonAsync<WoSummary>($"/api/work-orders/{wo.Id}/release", token, new { });
+
+        var before = await GetJsonAsync<List<WoSummary>>("/api/work-orders", token);
+        before.Should().Contain(w => w.Id == wo.Id && w.MaterialIssued == false);
+
+        await PostJsonAsync<WoDetail>($"/api/work-orders/{wo.Id}/issue", token, new { });
+
+        var after = await GetJsonAsync<List<WoSummary>>("/api/work-orders", token);
+        var row = after.Should().Contain(w => w.Id == wo.Id).Subject;
+        row.MaterialIssued.Should().BeTrue();
+        row.IssuedLineCount.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task Kitting_shows_required_vs_line_side_and_issue_consumes_stock()
     {
         var token = await LoginAsync("planner", "Planner@123");
@@ -210,7 +233,13 @@ public class WorkOrderSeamTests : IClassFixture<MesApiFactory>
     private sealed record MatDto(Guid Id, string Code);
     private sealed record InvDto(Guid MaterialId, string MaterialCode, decimal QuantityOnHand);
     private sealed record WoSummary(
-        Guid Id, string OrderNo, string Status, string? FrozenRouteVersion, string? FrozenBomVersion);
+        Guid Id,
+        string OrderNo,
+        string Status,
+        string? FrozenRouteVersion,
+        string? FrozenBomVersion,
+        bool MaterialIssued,
+        int IssuedLineCount);
     private sealed record IssueLineDto(
         string MaterialCode, decimal IssuedQty, decimal PendingQty, decimal ConsumedQty, bool IsKeyComponent);
     private sealed record WoDetail(WoSummary Header, List<IssueLineDto> IssueLines);

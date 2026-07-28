@@ -48,9 +48,11 @@ public static class WorkOrderEndpoints
         // ----- 工单 -----
         read.MapGet("/work-orders", async (MesDbContext db) =>
         {
+            // 含用料行：列表可显示是否已领料（IssueLines 有数量即已领过）
             // 先物化再按 CreatedAt 排序：SQLite 不能 ORDER BY DateTimeOffset
             var rows = await db.WorkOrders.AsNoTracking()
                 .Include(w => w.FinishedMaterial)
+                .Include(w => w.IssueLines)
                 .ToListAsync();
             return Results.Ok(rows.OrderByDescending(w => w.CreatedAt).Select(ToSummary).ToList());
         });
@@ -73,7 +75,9 @@ public static class WorkOrderEndpoints
                 var wo = await svc.CreateDraftAsync(
                     req.OrderNo, req.FinishedMaterialId, req.PlannedQty, req.ProcessRouteId, req.BomId);
                 await audit.WriteAsync("WorkOrderCreated", user.Identity?.Name ?? "", "WorkOrder", wo.Id.ToString(), wo.OrderNo);
-                var loaded = await db.WorkOrders.AsNoTracking().Include(x => x.FinishedMaterial)
+                var loaded = await db.WorkOrders.AsNoTracking()
+                    .Include(x => x.FinishedMaterial)
+                    .Include(x => x.IssueLines)
                     .FirstAsync(x => x.Id == wo.Id);
                 return Results.Created($"/api/work-orders/{wo.Id}", ToSummary(loaded));
             }
@@ -90,7 +94,10 @@ public static class WorkOrderEndpoints
             {
                 await svc.ReleaseAsync(id);
                 await audit.WriteAsync("WorkOrderReleased", user.Identity?.Name ?? "", "WorkOrder", id.ToString(), null);
-                var w = await db.WorkOrders.AsNoTracking().Include(x => x.FinishedMaterial).FirstAsync(x => x.Id == id);
+                var w = await db.WorkOrders.AsNoTracking()
+                    .Include(x => x.FinishedMaterial)
+                    .Include(x => x.IssueLines)
+                    .FirstAsync(x => x.Id == id);
                 return Results.Ok(ToSummary(w));
             }
             catch (InvalidOperationException ex)
@@ -106,7 +113,10 @@ public static class WorkOrderEndpoints
             {
                 await svc.CancelAsync(id);
                 await audit.WriteAsync("WorkOrderCancelled", user.Identity?.Name ?? "", "WorkOrder", id.ToString(), null);
-                var w = await db.WorkOrders.AsNoTracking().Include(x => x.FinishedMaterial).FirstAsync(x => x.Id == id);
+                var w = await db.WorkOrders.AsNoTracking()
+                    .Include(x => x.FinishedMaterial)
+                    .Include(x => x.IssueLines)
+                    .FirstAsync(x => x.Id == id);
                 return Results.Ok(ToSummary(w));
             }
             catch (InvalidOperationException ex)
@@ -151,19 +161,27 @@ public static class WorkOrderEndpoints
         });
     }
 
-    private static WorkOrderSummaryResponse ToSummary(WorkOrder w) => new(
-        w.Id,
-        w.OrderNo,
-        w.FinishedMaterial?.Code ?? "",
-        w.PlannedQty,
-        w.CompletedQty,
-        w.ScrappedQty,
-        w.Status.ToString(),
-        w.FrozenRouteVersion,
-        w.FrozenBomVersion,
-        w.InProcessSerialCount,
-        w.CreatedAt,
-        w.ReleasedAt);
+    private static WorkOrderSummaryResponse ToSummary(WorkOrder w)
+    {
+        // 任一用料行 IssuedQty>0 即视为已领过料（可再次补领，但 UI 会标「已领料」）
+        var issuedLines = w.IssueLines?.Count(l => l.IssuedQty > 0) ?? 0;
+        var materialIssued = issuedLines > 0;
+        return new(
+            w.Id,
+            w.OrderNo,
+            w.FinishedMaterial?.Code ?? "",
+            w.PlannedQty,
+            w.CompletedQty,
+            w.ScrappedQty,
+            w.Status.ToString(),
+            w.FrozenRouteVersion,
+            w.FrozenBomVersion,
+            w.InProcessSerialCount,
+            materialIssued,
+            issuedLines,
+            w.CreatedAt,
+            w.ReleasedAt);
+    }
 
     private static WorkOrderDetailResponse ToDetail(WorkOrder w) => new(
         ToSummary(w),
@@ -201,6 +219,10 @@ public record WorkOrderSummaryResponse(
     string? FrozenRouteVersion,
     string? FrozenBomVersion,
     int InProcessSerialCount,
+    /// <summary>是否已发生过领料（用料台账有 IssuedQty&gt;0）。</summary>
+    bool MaterialIssued,
+    /// <summary>已领料物料行数。</summary>
+    int IssuedLineCount,
     DateTimeOffset CreatedAt,
     DateTimeOffset? ReleasedAt);
 
