@@ -21,4 +21,10 @@ public class UserAccount
     public string Role { get; set; } = string.Empty;
 
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// 附加能力：可查看经营总览（计划员/班组长可开；经营者恒为 true）。
+    /// 操作工默认 false。
+    /// </summary>
+    public bool CanViewOpsOverview { get; set; }
 }

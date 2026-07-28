@@ -46,6 +46,8 @@ public static class DatabaseBootstrap
             _ = db.ProductSerials.AsNoTracking().Any();
             _ = db.FinishedGoodsInventories.AsNoTracking().Any();
             _ = db.ErpOutboxMessages.AsNoTracking().Any();
+            // 触发 Users 新列（CanViewOpsOverview）探测
+            _ = db.Users.AsNoTracking().Select(u => u.CanViewOpsOverview).Take(1).ToList();
             return true;
         }
         catch (Exception ex) when (IsMissingTable(ex))
@@ -59,14 +61,17 @@ public static class DatabaseBootstrap
         // SQL Server: Invalid object name → 208
         for (var e = ex; e != null; e = e.InnerException!)
         {
-            if (e is Microsoft.Data.SqlClient.SqlException sql && sql.Number == 208)
+            // 208 缺表；207 缺列（如 CanViewOpsOverview）
+            if (e is Microsoft.Data.SqlClient.SqlException sql && sql.Number is 208 or 207)
             {
                 return true;
             }
 
-            // SQLite 测试库：no such table
+            // SQLite 测试库 / SQL Server 缺列（二期加 CanViewOpsOverview 等）
             if (e.Message.Contains("no such table", StringComparison.OrdinalIgnoreCase)
-                || e.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase))
+                || e.Message.Contains("Invalid object name", StringComparison.OrdinalIgnoreCase)
+                || e.Message.Contains("Invalid column name", StringComparison.OrdinalIgnoreCase)
+                || e.Message.Contains("no such column", StringComparison.OrdinalIgnoreCase))
             {
                 return true;
             }

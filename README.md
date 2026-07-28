@@ -45,11 +45,12 @@ npm run dev
 
 ### 演示账号
 
-| 用户名 | 密码 | 角色 |
-|--------|------|------|
-| planner | Planner@123 | 计划员 Planner |
-| operator | Operator@123 | 操作工 Operator |
-| leader | Leader@123 | 班组长 Leader |
+| 用户名 | 密码 | 角色 | 默认落地 |
+|--------|------|------|----------|
+| planner | Planner@123 | 计划员 Planner | 管理端·工单 |
+| operator | Operator@123 | 操作工 Operator | 过站端 |
+| leader | Leader@123 | 班组长 Leader | 管理端·在制区（暂工单页） |
+| owner | Owner@123 | 经营者 Owner | 管理端·总览区（暂计划首页） |
 
 ## 测试
 

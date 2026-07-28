@@ -103,7 +103,18 @@ public class AuthSeamTests : IClassFixture<MesApiFactory>
         return dto!.AccessToken;
     }
 
-    private sealed record LoginResponse(string AccessToken, string UserName, string Role, string DisplayName);
-    private sealed record MeDto(string UserName, string Role, string DisplayName);
+    private sealed record LoginResponse(
+        string AccessToken,
+        string UserName,
+        string Role,
+        string DisplayName,
+        string? DefaultShell = null,
+        string? DefaultPath = null);
+    private sealed record MeDto(
+        string UserName,
+        string Role,
+        string DisplayName,
+        string? DefaultShell = null,
+        string? DefaultPath = null);
     private sealed record AuditDto(string Action, string ActorUserName, string? SubjectType, string? SubjectId, DateTimeOffset OccurredAt);
 }

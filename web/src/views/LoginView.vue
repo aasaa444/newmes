@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { login } from '../api'
+import { login, resolveHomePath } from '../api'
 
 const router = useRouter()
 const userName = ref('planner')
@@ -14,11 +14,7 @@ async function onSubmit() {
   loading.value = true
   try {
     const data = await login(userName.value.trim(), password.value)
-    if (data.role === 'Operator') {
-      await router.push('/station')
-    } else {
-      await router.push('/plan')
-    }
+    await router.push(resolveHomePath(data))
   } catch (e) {
     error.value = e.message || '登录失败'
   } finally {
@@ -31,7 +27,7 @@ async function onSubmit() {
   <div class="shell" style="max-width: 420px; padding-top: 10vh">
     <div class="card">
       <div class="brand">无名 MES · 试点</div>
-      <p class="muted">离散电子组装 · 本地账号登录（计划员 / 操作工 / 班组长）</p>
+      <p class="muted">离散电子组装 · 本地账号（计划员 / 操作工 / 班组长 / 经营者）</p>
       <form @submit.prevent="onSubmit">
         <label class="field">
           <span>用户名</span>
@@ -47,7 +43,8 @@ async function onSubmit() {
         </button>
       </form>
       <p class="muted" style="margin-top: 1rem; font-size: 0.8rem">
-        演示账号 planner / operator / leader，密码分别为 Planner@123、Operator@123、Leader@123
+        planner / operator / leader / owner<br />
+        密码：Planner@123 · Operator@123 · Leader@123 · Owner@123
       </p>
     </div>
   </div>

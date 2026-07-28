@@ -50,6 +50,7 @@ public class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(op
             e.Property(x => x.DisplayName).HasMaxLength(128).IsRequired();
             e.Property(x => x.PasswordHash).HasMaxLength(200).IsRequired();
             e.Property(x => x.Role).HasMaxLength(32).IsRequired();
+            e.Property(x => x.CanViewOpsOverview);
         });
 
         modelBuilder.Entity<BusinessAuditEntry>(e =>

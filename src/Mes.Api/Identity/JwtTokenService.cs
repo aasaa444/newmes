@@ -18,20 +18,28 @@ public class JwtOptions
     public int ExpireMinutes { get; set; } = 480;
 }
 
-/// <summary>签发访问令牌；Role 写入 ClaimTypes.Role 供 [Authorize] 使用。</summary>
+/// <summary>签发访问令牌；Role 与能力 claim 供 Authorize / 前端落地使用。</summary>
 public class JwtTokenService(Microsoft.Extensions.Options.IOptions<JwtOptions> options)
 {
+    public const string ClaimCanViewOpsOverview = "can_view_ops_overview";
+    public const string ClaimDefaultShell = "default_shell";
+    public const string ClaimDefaultPath = "default_path";
+
     private readonly JwtOptions _opt = options.Value;
 
     public string CreateToken(UserAccount user)
     {
+        var landing = RoleAccess.ForUser(user);
         var claims = new List<Claim>
         {
             new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new(JwtRegisteredClaimNames.UniqueName, user.UserName),
             new(ClaimTypes.Name, user.UserName),
             new(ClaimTypes.Role, user.Role),
-            new("display_name", user.DisplayName)
+            new("display_name", user.DisplayName),
+            new(ClaimCanViewOpsOverview, landing.CanViewOpsOverview ? "true" : "false"),
+            new(ClaimDefaultShell, landing.DefaultShell),
+            new(ClaimDefaultPath, landing.DefaultPath)
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_opt.SigningKey));

@@ -60,9 +60,16 @@ builder.Services
 // 策略名在端点 RequireAuthorization("...") 中引用
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy("PlannerOnly", p => p.RequireRole(AppRoles.Planner));       // 计划员：主数据/工单写
-    options.AddPolicy("StationRoles", p => p.RequireRole(AppRoles.Operator, AppRoles.Leader, AppRoles.Planner));
-    options.AddPolicy("AnyBusinessRole", p => p.RequireRole(AppRoles.All));       // 三角色均可
+    options.AddPolicy("PlannerOnly", p => p.RequireRole(AppRoles.Planner)); // 主数据/工单写：仅计划员
+    // 过站写：不含经营者（Owner 只读经营）
+    options.AddPolicy("StationRoles", p => p.RequireRole(AppRoles.StationWriters));
+    options.AddPolicy("AnyBusinessRole", p => p.RequireRole(AppRoles.All)); // 含经营者可读
+    options.AddPolicy("OpsOverviewRead", p => p.RequireAssertion(ctx =>
+    {
+        if (ctx.User.IsInRole(AppRoles.Owner) || ctx.User.IsInRole(AppRoles.Planner) || ctx.User.IsInRole(AppRoles.Leader))
+            return true;
+        return ctx.User.FindFirst(JwtTokenService.ClaimCanViewOpsOverview)?.Value == "true";
+    }));
 });
 
 builder.Services.AddCors(options =>
@@ -130,16 +137,45 @@ app.MapPost("/api/auth/login", async (LoginRequest req, MesDbContext db, JwtToke
     var accessToken = tokens.CreateToken(user);
     await audit.WriteAsync("Login", user.UserName, "User", user.Id.ToString(), "Local password login");
 
-    return Results.Ok(new LoginResponse(accessToken, user.UserName, user.Role, user.DisplayName));
+    var landing = RoleAccess.ForUser(user);
+    return Results.Ok(new LoginResponse(
+        accessToken,
+        user.UserName,
+        user.Role,
+        user.DisplayName,
+        landing.DefaultShell,
+        landing.DefaultPath,
+        landing.CanViewOpsOverview,
+        landing.CanAccessManagementShell,
+        landing.CanAccessStationShell,
+        landing.CanWriteExecution,
+        landing.CanWriteStation,
+        landing.CanWriteMasterData));
 })
 .AllowAnonymous();
 
-app.MapGet("/api/me", (ClaimsPrincipal user) =>
+app.MapGet("/api/me", async (ClaimsPrincipal principal, MesDbContext db) =>
 {
-    var userName = user.Identity?.Name ?? user.FindFirstValue(ClaimTypes.Name) ?? "";
-    var role = user.FindFirstValue(ClaimTypes.Role) ?? "";
-    var display = user.FindFirstValue("display_name") ?? userName;
-    return Results.Ok(new MeResponse(userName, role, display));
+    var userName = principal.Identity?.Name ?? principal.FindFirstValue(ClaimTypes.Name) ?? "";
+    var account = await db.Users.AsNoTracking().FirstOrDefaultAsync(u => u.UserName == userName && u.IsActive);
+    if (account is null)
+    {
+        return Results.Unauthorized();
+    }
+
+    var landing = RoleAccess.ForUser(account);
+    return Results.Ok(new MeResponse(
+        account.UserName,
+        account.Role,
+        account.DisplayName,
+        landing.DefaultShell,
+        landing.DefaultPath,
+        landing.CanViewOpsOverview,
+        landing.CanAccessManagementShell,
+        landing.CanAccessStationShell,
+        landing.CanWriteExecution,
+        landing.CanWriteStation,
+        landing.CanWriteMasterData));
 })
 .RequireAuthorization("AnyBusinessRole");
 
@@ -182,6 +218,34 @@ app.Run();
 public partial class Program;
 
 public record LoginRequest(string UserName, string Password);
-public record LoginResponse(string AccessToken, string UserName, string Role, string DisplayName);
-public record MeResponse(string UserName, string Role, string DisplayName);
+
+/// <summary>登录成功：令牌 + 二期落地/能力声明。</summary>
+public record LoginResponse(
+    string AccessToken,
+    string UserName,
+    string Role,
+    string DisplayName,
+    string DefaultShell,
+    string DefaultPath,
+    bool CanViewOpsOverview,
+    bool CanAccessManagementShell,
+    bool CanAccessStationShell,
+    bool CanWriteExecution,
+    bool CanWriteStation,
+    bool CanWriteMasterData);
+
+/// <summary>当前用户：与登录响应同构的能力声明（不含令牌）。</summary>
+public record MeResponse(
+    string UserName,
+    string Role,
+    string DisplayName,
+    string DefaultShell,
+    string DefaultPath,
+    bool CanViewOpsOverview,
+    bool CanAccessManagementShell,
+    bool CanAccessStationShell,
+    bool CanWriteExecution,
+    bool CanWriteStation,
+    bool CanWriteMasterData);
+
 public record AuditResponse(string Action, string ActorUserName, string? SubjectType, string? SubjectId, DateTimeOffset OccurredAt);

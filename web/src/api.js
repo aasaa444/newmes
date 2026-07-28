@@ -3,6 +3,7 @@
  * - 开发：VITE_API_BASE 指向 ASP.NET（默认 http://localhost:5101）
  * - Compose：nginx 反代 /api，可留空走同源
  * Token 存在 localStorage；401 时清会话（需路由守卫配合跳转登录）。
+ * 二期：会话含 defaultShell / defaultPath / 能力位。
  */
 const API_BASE = import.meta.env.VITE_API_BASE || ''
 
@@ -10,9 +11,24 @@ export function getToken() {
   return localStorage.getItem('mes_token') || ''
 }
 
-export function setSession({ accessToken, userName, role, displayName }) {
-  localStorage.setItem('mes_token', accessToken)
-  localStorage.setItem('mes_user', JSON.stringify({ userName, role, displayName }))
+export function setSession(session) {
+  localStorage.setItem('mes_token', session.accessToken)
+  localStorage.setItem(
+    'mes_user',
+    JSON.stringify({
+      userName: session.userName,
+      role: session.role,
+      displayName: session.displayName,
+      defaultShell: session.defaultShell,
+      defaultPath: session.defaultPath,
+      canViewOpsOverview: session.canViewOpsOverview,
+      canAccessManagementShell: session.canAccessManagementShell,
+      canAccessStationShell: session.canAccessStationShell,
+      canWriteExecution: session.canWriteExecution,
+      canWriteStation: session.canWriteStation,
+      canWriteMasterData: session.canWriteMasterData,
+    })
+  )
 }
 
 export function clearSession() {
@@ -28,6 +44,17 @@ export function getUser() {
   } catch {
     return null
   }
+}
+
+/** 按角色/能力返回登录后应去的路径 */
+export function resolveHomePath(user) {
+  if (!user) return '/login'
+  if (user.defaultPath) return user.defaultPath
+  if (user.role === 'Operator') return '/station'
+  if (user.role === 'Owner') return '/plan'
+  if (user.role === 'Planner') return '/plan/work-orders'
+  if (user.role === 'Leader') return '/plan/work-orders'
+  return '/plan'
 }
 
 export async function api(path, options = {}) {
@@ -60,6 +87,14 @@ export async function login(userName, password) {
     userName: data.userName,
     role: data.role,
     displayName: data.displayName,
+    defaultShell: data.defaultShell,
+    defaultPath: data.defaultPath,
+    canViewOpsOverview: data.canViewOpsOverview,
+    canAccessManagementShell: data.canAccessManagementShell,
+    canAccessStationShell: data.canAccessStationShell,
+    canWriteExecution: data.canWriteExecution,
+    canWriteStation: data.canWriteStation,
+    canWriteMasterData: data.canWriteMasterData,
   })
   return data
 }
