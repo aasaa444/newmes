@@ -51,11 +51,11 @@ public class StationPassService(MesDbContext db)
         else
         {
             serialNo = serialNo.Trim().ToUpperInvariant();
-            serial = await db.ProductSerials
+            var existing = await db.ProductSerials
                 .Include(s => s.WorkOrder)
                 .FirstOrDefaultAsync(s => s.SerialNo == serialNo, ct);
 
-            if (serial is null)
+            if (existing is null)
             {
                 // 扫入新码上线
                 if (workOrderId is null)
@@ -71,6 +71,15 @@ public class StationPassService(MesDbContext db)
             }
             else
             {
+                serial = existing;
+
+                // 隔离/报废/已完工：禁止正常合格过站（隔离须先放行，票 05）
+                if (serial.Status == ProcessStepStatus.Isolated)
+                {
+                    throw new InvalidOperationException(
+                        "serial is isolated; release before pass (cannot complete while isolated)");
+                }
+
                 if (serial.Status != ProcessStepStatus.InProcess)
                 {
                     throw new InvalidOperationException($"serial status is {serial.Status}, cannot pass");
@@ -164,6 +173,11 @@ public class StationPassService(MesDbContext db)
             throw new InvalidOperationException("cannot bind to scrapped serial");
         }
 
+        if (serial.Status is ProcessStepStatus.Isolated)
+        {
+            throw new InvalidOperationException("cannot bind while isolated; release first");
+        }
+
         var mat = await db.Materials.FirstOrDefaultAsync(m => m.Id == componentMaterialId, ct)
             ?? throw new InvalidOperationException("component material not found");
 
@@ -250,7 +264,8 @@ public class StationPassService(MesDbContext db)
                 p.WorkStation?.Code,
                 p.Result,
                 p.OperatorUserName,
-                p.OccurredAt)).ToList(),
+                p.OccurredAt,
+                p.Remark)).ToList(),
             bindings.OrderBy(b => b.BoundAt).Select(b => new BindingEventDto(
                 b.ComponentMaterial?.Code ?? "",
                 b.ComponentSerialNo,
@@ -345,7 +360,8 @@ public record PassEventDto(
     string? StationCode,
     string Result,
     string? OperatorUserName,
-    DateTimeOffset OccurredAt);
+    DateTimeOffset OccurredAt,
+    string? Remark);
 
 public record BindingEventDto(
     string ComponentMaterialCode,

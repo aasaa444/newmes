@@ -22,6 +22,7 @@ builder.Services.AddSingleton<JwtTokenService>();
 builder.Services.AddScoped<AuditService>(); // 业务审计：谁在何时对何对象做了什么
 builder.Services.AddScoped<WorkOrderService>(); // 工单状态机、齐套、领料
 builder.Services.AddScoped<StationPassService>(); // 过站、防跳站、关键件绑定、谱系
+builder.Services.AddScoped<QualityService>(); // 不合格/隔离/返工/报废/放行
 
 var connectionString = builder.Configuration.GetConnectionString("MesDb")
     ?? "Server=(localdb)\\MSSQLLocalDB;Database=MesDb;Trusted_Connection=True;TrustServerCertificate=True";

@@ -6,8 +6,8 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.Api.Execution;
 
 /// <summary>
-/// 过站台 API（票 04）：选工位过站、关键件绑定、谱系查询。
-/// 写：StationRoles（操作工/班组长/计划员）；谱系只读：AnyBusinessRole。
+/// 过站台 API（票 04+05）：合格过站、关键件绑定、谱系、不合格/隔离/返工/报废/放行。
+/// 写：StationRoles；谱系与隔离列表：AnyBusinessRole（班组长可看异常）。
 /// </summary>
 public static class StationPassEndpoints
 {
@@ -107,6 +107,101 @@ public static class StationPassEndpoints
                 return Results.NotFound(new { error = ex.Message });
             }
         });
+
+        // ----- 票 05：质量 -----
+        station.MapPost("/station/fail", async (
+            StationFailRequest req,
+            QualityService quality,
+            AuditService audit,
+            ClaimsPrincipal user,
+            MesDbContext db) =>
+        {
+            try
+            {
+                var op = user.Identity?.Name ?? "";
+                var serial = await quality.FailAsync(
+                    req.WorkStationId,
+                    req.SerialNo,
+                    req.Disposition,
+                    req.Reason,
+                    req.ReworkToSequence,
+                    op);
+                await audit.WriteAsync(
+                    $"Quality{req.Disposition}",
+                    op,
+                    "ProductSerial",
+                    serial.Id.ToString(),
+                    $"{serial.SerialNo}:{req.Disposition}");
+
+                return Results.Ok(await ToSerialStatusAsync(db, serial));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        read.MapGet("/quality/isolated", async (QualityService quality) =>
+        {
+            var items = await quality.ListIsolatedAsync();
+            return Results.Ok(items);
+        });
+
+        // 放行：班组长/计划员为主；操作工若在 StationRoles 也可（试点简化）
+        station.MapPost("/quality/release", async (
+            QualityReleaseRequest req,
+            QualityService quality,
+            AuditService audit,
+            ClaimsPrincipal user,
+            MesDbContext db) =>
+        {
+            try
+            {
+                var op = user.Identity?.Name ?? "";
+                var serial = await quality.ReleaseAsync(req.SerialNo, req.Reason, req.ReturnToSequence, op);
+                await audit.WriteAsync("QualityRelease", op, "ProductSerial", serial.Id.ToString(), serial.SerialNo);
+                return Results.Ok(await ToSerialStatusAsync(db, serial));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        station.MapPost("/quality/scrap", async (
+            QualityScrapRequest req,
+            QualityService quality,
+            AuditService audit,
+            ClaimsPrincipal user,
+            MesDbContext db) =>
+        {
+            try
+            {
+                var op = user.Identity?.Name ?? "";
+                var serial = await quality.ScrapAsync(req.SerialNo, req.Reason, op, req.WorkStationId);
+                await audit.WriteAsync("QualityScrap", op, "ProductSerial", serial.Id.ToString(), serial.SerialNo);
+                return Results.Ok(await ToSerialStatusAsync(db, serial));
+            }
+            catch (InvalidOperationException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+    }
+
+    private static async Task<SerialStatusResponse> ToSerialStatusAsync(MesDbContext db, ProductSerial serial)
+    {
+        var cur = serial.CurrentProcessStepId is null
+            ? null
+            : await db.ProcessSteps.AsNoTracking()
+                .FirstOrDefaultAsync(p => p.Id == serial.CurrentProcessStepId);
+        return new SerialStatusResponse(
+            serial.Id,
+            serial.SerialNo,
+            serial.WorkOrderId,
+            serial.Status.ToString(),
+            cur?.Code,
+            cur?.Name);
     }
 }
 
@@ -129,3 +224,14 @@ public record SerialStatusResponse(
     string Status,
     string? CurrentStepCode,
     string? CurrentStepName);
+
+public record StationFailRequest(
+    Guid WorkStationId,
+    string SerialNo,
+    /// <summary>Rework | Isolate | Scrap</summary>
+    string Disposition,
+    string? Reason,
+    int? ReworkToSequence);
+
+public record QualityReleaseRequest(string SerialNo, string Reason, int? ReturnToSequence);
+public record QualityScrapRequest(string SerialNo, string? Reason, Guid? WorkStationId);

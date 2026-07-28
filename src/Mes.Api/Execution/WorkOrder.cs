@@ -22,7 +22,7 @@ public class WorkOrder
     /// <summary>合格完工数（票 06 累加；本票保持 0）。</summary>
     public decimal CompletedQty { get; set; }
 
-    /// <summary>报废数（票 05；本票保持 0）。</summary>
+    /// <summary>报废数（票 05 累加）。</summary>
     public decimal ScrappedQty { get; set; }
 
     public WorkOrderStatus Status { get; set; } = WorkOrderStatus.Draft;
@@ -41,8 +41,7 @@ public class WorkOrder
     public string? FrozenBomVersion { get; set; }
 
     /// <summary>
-    /// 在制 SN 个数。票 04 首站过站 +1；取消时必须为 0。
-    /// 本票无过站，故一直为 0，取消规则仍可测。
+    /// 在制 SN 个数。首站过站 +1；报废 -1；取消时必须为 0。
     /// </summary>
     public int InProcessSerialCount { get; set; }
 

@@ -1,7 +1,7 @@
 <script setup>
 /**
- * 过站台（票 04）：选工位 → 扫/发 SN 过站 → 可选绑关键件 → 查谱系。
- * 大字、扫码优先；业务规则在 API（防跳站等）。
+ * 过站台（票 04+05）：选工位 → 过站/不合格 → 关键件绑定 → 谱系；
+ * 隔离列表与放行/报废（班组长/计划员常用）。
  */
 import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
@@ -11,13 +11,16 @@ const router = useRouter()
 const user = getUser()
 const stations = ref([])
 const workOrders = ref([])
+const isolated = ref([])
 const stationId = ref('')
 const workOrderId = ref('')
 const serialInput = ref('')
 const lastSerial = ref('')
 const componentSerial = ref('')
 const pcbMaterialId = ref('')
-const message = ref('选择工位后扫描或回车过站；空码则系统发号（须选工单）。')
+const failReason = ref('')
+const releaseReason = ref('复测放行')
+const message = ref('选择工位后扫描过站；不合格可选返工/隔离/报废。')
 const error = ref('')
 const genealogy = ref(null)
 
@@ -25,30 +28,38 @@ const currentStation = computed(() =>
   stations.value.find((s) => s.id === stationId.value)
 )
 
-onMounted(async () => {
-  const [st, wo, mats] = await Promise.all([
+async function refreshLists() {
+  const [st, wo, mats, iso] = await Promise.all([
     api('/api/stations/active'),
     api('/api/work-orders'),
     api('/api/materials'),
+    api('/api/quality/isolated'),
   ])
   if (st.ok) {
     stations.value = await st.json()
-    const online = stations.value.find((s) => s.stepCode === 'ONLINE')
-    if (online) stationId.value = online.id
+    if (!stationId.value) {
+      const online = stations.value.find((s) => s.stepCode === 'ONLINE')
+      if (online) stationId.value = online.id
+    }
   }
   if (wo.ok) {
     const list = await wo.json()
     workOrders.value = list.filter(
       (w) => w.status === 'Released' || w.status === 'InProcess'
     )
-    if (workOrders.value.length) workOrderId.value = workOrders.value[0].id
+    if (!workOrderId.value && workOrders.value.length) {
+      workOrderId.value = workOrders.value[0].id
+    }
   }
   if (mats.ok) {
     const m = await mats.json()
     const pcb = m.find((x) => x.code === 'PCB-MAIN')
     if (pcb) pcbMaterialId.value = pcb.id
   }
-})
+  if (iso.ok) isolated.value = await iso.json()
+}
+
+onMounted(refreshLists)
 
 async function onPass() {
   error.value = ''
@@ -57,14 +68,13 @@ async function onPass() {
     error.value = '请先选择工位'
     return
   }
-  const body = {
-    workStationId: stationId.value,
-    serialNo: serialInput.value.trim() || null,
-    workOrderId: workOrderId.value || null,
-  }
   const res = await api('/api/station/pass', {
     method: 'POST',
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      workStationId: stationId.value,
+      serialNo: serialInput.value.trim() || null,
+      workOrderId: workOrderId.value || null,
+    }),
   })
   const data = await res.json().catch(() => ({}))
   if (!res.ok) {
@@ -73,8 +83,75 @@ async function onPass() {
   }
   lastSerial.value = data.serialNo
   serialInput.value = ''
-  message.value = `过站成功 ${data.serialNo} → 下一工序 ${data.currentStepCode || '（路线完成）'} [${data.status}]`
+  message.value = `过站成功 ${data.serialNo} → ${data.currentStepCode || '路线完成'} [${data.status}]`
   await loadGenealogy(data.serialNo)
+  await refreshLists()
+}
+
+async function onFail(disposition) {
+  error.value = ''
+  const sn = serialInput.value.trim() || lastSerial.value
+  if (!stationId.value || !sn) {
+    error.value = '需要工位与成品 SN'
+    return
+  }
+  const body = {
+    workStationId: stationId.value,
+    serialNo: sn,
+    disposition,
+    reason: failReason.value || disposition,
+    reworkToSequence: disposition === 'Rework' ? 10 : null,
+  }
+  const res = await api('/api/station/fail', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    error.value = data.error || `不合格处理失败 ${res.status}`
+    return
+  }
+  lastSerial.value = data.serialNo
+  serialInput.value = data.serialNo
+  message.value = `${disposition} → ${data.serialNo} [${data.status}] 当前 ${data.currentStepCode || '—'}`
+  await loadGenealogy(data.serialNo)
+  await refreshLists()
+}
+
+async function onRelease(sn) {
+  error.value = ''
+  const res = await api('/api/quality/release', {
+    method: 'POST',
+    body: JSON.stringify({
+      serialNo: sn,
+      reason: releaseReason.value || '放行',
+    }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    error.value = data.error || `放行失败 ${res.status}`
+    return
+  }
+  message.value = `已放行 ${data.serialNo}`
+  lastSerial.value = data.serialNo
+  await loadGenealogy(data.serialNo)
+  await refreshLists()
+}
+
+async function onScrap(sn) {
+  error.value = ''
+  const res = await api('/api/quality/scrap', {
+    method: 'POST',
+    body: JSON.stringify({ serialNo: sn, reason: '确认报废' }),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    error.value = data.error || `报废失败 ${res.status}`
+    return
+  }
+  message.value = `已报废 ${data.serialNo}`
+  await loadGenealogy(data.serialNo)
+  await refreshLists()
 }
 
 async function onBind() {
@@ -144,7 +221,7 @@ function logout() {
       </label>
 
       <label class="field">
-        <span>工单（新开 SN / 系统发号时必选）</span>
+        <span>工单（新开 SN 时必选）</span>
         <select v-model="workOrderId" class="station-input" style="font-size: 1rem">
           <option value="">（续过站可不选）</option>
           <option v-for="w in workOrders" :key="w.id" :value="w.id">
@@ -168,6 +245,18 @@ function logout() {
         </button>
       </form>
 
+      <div style="margin-top: 1rem">
+        <label class="field">
+          <span>不合格原因</span>
+          <input v-model="failReason" class="station-input" placeholder="可选说明" />
+        </label>
+        <div class="nav" style="gap: 0.5rem; flex-wrap: wrap">
+          <button class="btn" type="button" @click="onFail('Rework')">返工(回上线)</button>
+          <button class="btn" type="button" @click="onFail('Isolate')">隔离</button>
+          <button class="btn" type="button" @click="onFail('Scrap')">报废</button>
+        </div>
+      </div>
+
       <p v-if="error" class="error">{{ error }}</p>
       <p>{{ message }}</p>
 
@@ -182,17 +271,35 @@ function logout() {
         </form>
       </div>
 
+      <div v-if="isolated.length" class="card" style="margin-top: 1rem; background: #1c1917">
+        <h3 style="margin-top: 0">隔离中（{{ isolated.length }}）</h3>
+        <label class="field">
+          <span>放行原因</span>
+          <input v-model="releaseReason" class="station-input" />
+        </label>
+        <ul>
+          <li v-for="row in isolated" :key="row.id" style="margin-bottom: 0.5rem">
+            <strong>{{ row.serialNo }}</strong>
+            <span class="muted"> · {{ row.workOrderNo }} · {{ row.currentStepCode || '—' }}</span>
+            <button class="btn" type="button" style="margin-left: 0.5rem" @click="onRelease(row.serialNo)">
+              放行
+            </button>
+            <button class="btn ghost" type="button" @click="onScrap(row.serialNo)">报废</button>
+          </li>
+        </ul>
+      </div>
+
       <div v-if="genealogy" class="card" style="margin-top: 1rem; background: #0f172a">
         <h3 style="margin-top: 0">谱系 {{ genealogy.serialNo }}</h3>
         <p class="muted">
           工单 {{ genealogy.workOrderNo }} · {{ genealogy.status }} · 当前
           {{ genealogy.currentStepCode || '—' }}
         </p>
-        <p><strong>过站</strong></p>
+        <p><strong>履历</strong></p>
         <ul>
           <li v-for="(p, i) in genealogy.passes" :key="i">
-            {{ p.stepCode }} {{ p.stepName }} — {{ p.result }}
-            <span class="muted">{{ p.stationCode }} {{ p.operatorUserName }}</span>
+            {{ p.stepCode }} — <strong>{{ p.result }}</strong>
+            <span class="muted"> {{ p.remark || '' }} {{ p.operatorUserName }}</span>
           </li>
         </ul>
         <p><strong>关键件</strong></p>

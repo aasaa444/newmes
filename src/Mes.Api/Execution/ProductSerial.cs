@@ -25,7 +25,10 @@ public class ProductSerial
     public List<ComponentBinding> ComponentBindings { get; set; } = [];
 }
 
-/// <summary>个体在制状态（票 05 会扩展隔离/报废）。</summary>
+/// <summary>
+/// 个体状态：InProcess 可过站；Isolated 须放行；Scrapped 终态；
+/// RouteCompleted 待入库（票 06），隔离品不得当合格入库。
+/// </summary>
 public enum ProcessStepStatus
 {
     InProcess = 0,

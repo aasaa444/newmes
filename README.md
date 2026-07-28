@@ -80,6 +80,11 @@ docker compose up --build
 - [x] 关键件绑定（Pending→Consumed）；`GET /api/genealogy/{sn}`
 - [x] 过站台大字 UI
 
+### 05 质量：隔离 / 返工 / 报废
+- [x] `POST /api/station/fail`（Rework|Isolate|Scrap）
+- [x] 隔离拦过站；`POST /api/quality/release` / `scrap`；`GET /api/quality/isolated`
+- [x] 报废累加工单 `ScrappedQty`；谱系保留 Fail/Rework/Release/Scrap
+
 ## 主数据 API（摘要）
 
 | 方法 | 路径 | 授权 |

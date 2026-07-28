@@ -4,10 +4,14 @@
 
 **Blocked by:** 04 — 过站台、SN、防跳站与谱系（黄金路径核心）
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 不合格可走返工/隔离/报废之一（按工序或操作选择）
-- [ ] 隔离 SN 不能走正常完工入库
-- [ ] 放行留痕后可回到路线流动
-- [ ] 报废计入工单报废数并结束该 SN 正常在制
-- [ ] 质量相关动作可审计且谱系可查
+- [x] 不合格可走返工/隔离/报废之一（按工序或操作选择）
+- [x] 隔离 SN 不能走正常完工入库
+- [x] 放行留痕后可回到路线流动
+- [x] 报废计入工单报废数并结束该 SN 正常在制
+- [x] 质量相关动作可审计且谱系可查
+
+## Answer
+
+QualityService: Fail(Rework|Isolate|Scrap), Release, Scrap, ListIsolated. Isolated blocks station pass/bind. Scrap updates WorkOrder.ScrappedQty and InProcessSerialCount. Genealogy keeps Fail/Rework/Release/Scrap history. APIs + station UI. QualitySeamTests 5 green.
