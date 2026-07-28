@@ -266,9 +266,12 @@ public static class MasterDataEndpoints
 
         read.MapGet("/work-stations", async (MesDbContext db) =>
         {
+            // 与过站台一致：按绑定工序 Sequence 排序，符合产线工艺顺序
             var items = await db.WorkStations.AsNoTracking()
                 .Include(s => s.BoundProcessStep)
-                .OrderBy(s => s.Code)
+                .OrderBy(s => s.ProductionLineId)
+                .ThenBy(s => s.BoundProcessStep!.Sequence)
+                .ThenBy(s => s.Code)
                 .Select(s => new StationResponse(
                     s.Id,
                     s.Code,

@@ -16,17 +16,25 @@ public static class StationPassEndpoints
         var station = app.MapGroup("/api").RequireAuthorization("StationRoles");
         var read = app.MapGroup("/api").RequireAuthorization("AnyBusinessRole");
 
-        // 工位列表（过站台下拉）
+        // 工位列表（过站台下拉）：按绑定工序的工艺顺序 Sequence，不是工位编码字母序
+        // 否则 ST-ASM 会排在 ST-FLASH 前面，和真实产线 ONLINE→FLASH→ASM→FQC→PACK 不一致
         read.MapGet("/stations/active", async (MesDbContext db) =>
         {
             var items = await db.WorkStations.AsNoTracking()
                 .Include(s => s.BoundProcessStep)
                 .Include(s => s.ProductionLine)
                 .Where(s => s.IsActive)
-                .OrderBy(s => s.Code)
+                .OrderBy(s => s.ProductionLine!.Code)
+                .ThenBy(s => s.BoundProcessStep!.Sequence)
+                .ThenBy(s => s.Code)
                 .Select(s => new ActiveStationDto(
-                    s.Id, s.Code, s.Name,
-                    s.BoundProcessStepId, s.BoundProcessStep!.Code, s.BoundProcessStep.Name,
+                    s.Id,
+                    s.Code,
+                    s.Name,
+                    s.BoundProcessStepId,
+                    s.BoundProcessStep!.Code,
+                    s.BoundProcessStep.Name,
+                    s.BoundProcessStep.Sequence,
                     s.ProductionLine!.Code))
                 .ToListAsync();
             return Results.Ok(items);
@@ -213,8 +221,14 @@ public record BindComponentRequest(
     Guid? WorkStationId);
 
 public record ActiveStationDto(
-    Guid Id, string Code, string Name,
-    Guid BoundProcessStepId, string StepCode, string StepName,
+    Guid Id,
+    string Code,
+    string Name,
+    Guid BoundProcessStepId,
+    string StepCode,
+    string StepName,
+    /// <summary>绑定工序在工艺路线中的顺序号（10/20/30…），用于产线顺序展示。</summary>
+    int StepSequence,
     string LineCode);
 
 public record SerialStatusResponse(

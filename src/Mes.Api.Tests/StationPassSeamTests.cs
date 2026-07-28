@@ -16,6 +16,18 @@ public class StationPassSeamTests : IClassFixture<MesApiFactory>
     public StationPassSeamTests(MesApiFactory factory) => _client = factory.CreateClient();
 
     [Fact]
+    public async Task Active_stations_ordered_by_process_step_sequence()
+    {
+        var token = await LoginAsync("operator", "Operator@123");
+        var stations = await GetAsync<List<StationOrderDto>>("/api/stations/active", token);
+        stations.Should().NotBeEmpty();
+        // 工艺顺序 ONLINE(10)→FLASH(20)→ASSEMBLY(30)→FQC(40)→PACK(50)，不能按 ST-ASM 字母序
+        var codes = stations.Select(s => s.StepCode).ToList();
+        codes.Should().ContainInOrder("ONLINE", "FLASH", "ASSEMBLY", "FQC", "PACK");
+        stations.Select(s => s.StepSequence).Should().BeInAscendingOrder();
+    }
+
+    [Fact]
     public async Task First_station_pass_creates_serial_and_moves_work_order_in_process()
     {
         var token = await LoginAsync("operator", "Operator@123");
@@ -241,6 +253,7 @@ public class StationPassSeamTests : IClassFixture<MesApiFactory>
     private sealed record LoginDto(string AccessToken);
     private sealed record MatDto(Guid Id, string Code);
     private sealed record StationDto(Guid Id, string Code, string StepCode);
+    private sealed record StationOrderDto(Guid Id, string Code, string StepCode, int StepSequence);
     private sealed record SerialDto(string SerialNo, string Status, string? CurrentStepCode);
     private sealed record WoDto(Guid Id, string Status, int InProcessSerialCount);
     private sealed record WoDetailDto(WoDto Header);

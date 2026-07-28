@@ -235,9 +235,9 @@ function logout() {
       <label class="field">
         <span>工位</span>
         <select v-model="stationId" class="station-input" style="font-size: 1.1rem">
-          <option disabled value="">请选择</option>
-          <option v-for="s in stations" :key="s.id" :value="s.id">
-            {{ s.code }} — {{ s.stepName }}
+          <option disabled value="">请选择（已按工艺顺序）</option>
+          <option v-for="(s, idx) in stations" :key="s.id" :value="s.id">
+            {{ idx + 1 }}. {{ s.stepName }}（{{ s.stepCode }}）— {{ s.code }}
           </option>
         </select>
       </label>
