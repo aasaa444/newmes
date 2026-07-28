@@ -1,0 +1,45 @@
+# Private pilot delivery (ADR-0004). Docker Desktop must be running.
+# LocalDB alternative for dev without Docker: run API against ConnectionStrings:MesDb in appsettings.
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: "Mes_Dev_Passw0rd!"
+    ports:
+      - "1433:1433"
+    volumes:
+      - mes-sql-data:/var/opt/mssql
+    healthcheck:
+      test: /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "Mes_Dev_Passw0rd!" -C -Q "SELECT 1" || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  api:
+    build:
+      context: ./src/Mes.Api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__MesDb: "Server=db,1433;Database=MesDb;User Id=sa;Password=Mes_Dev_Passw0rd!;TrustServerCertificate=True"
+      Jwt__SigningKey: "DEV_ONLY_CHANGE_ME_TO_A_LONG_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS"
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    ports:
+      - "8081:80"
+    depends_on:
+      - api
+
+volumes:
+  mes-sql-data:
