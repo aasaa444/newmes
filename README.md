@@ -2,6 +2,12 @@
 
 离散电子组装车间制造执行系统骨架。领域词汇见 [`CONTEXT.md`](./CONTEXT.md)，决策见 [`docs/adr/`](./docs/adr/)，规格与票见 [`.scratch/mes-first-phase/`](./.scratch/mes-first-phase/)。
 
+**第一期已验收（票 01–07）。**  
+- 人工演示：[`docs/DEMO.md`](./docs/DEMO.md)  
+- 验收勾选：[`docs/PHASE1_ACCEPTANCE.md`](./docs/PHASE1_ACCEPTANCE.md)  
+- API 烟测：`pwsh -File docs/DEMO_API.ps1`（API 已启动时）  
+- 自动化：`dotnet test src/Mes.Api.Tests`（含 `Phase1E2eSeamTests`）
+
 ## 技术栈
 
 - 后端：ASP.NET Core（.NET 10）+ SQL Server（开发可用 LocalDB）
@@ -90,6 +96,12 @@ docker compose up --build
 - [x] 隔离/报废不可入库；`GET /api/inventory/finished-goods`
 - [x] `GET /api/erp/outbox`（领料/入库/关单报文）；`POST .../close`
 - [x] 计划端「集成与审计」页
+
+### 07 端到端演示与验收
+- [x] `docs/DEMO.md` 黄金路径 + 异常支线
+- [x] `docs/PHASE1_ACCEPTANCE.md` 对照完成定义
+- [x] `Phase1E2eSeamTests` 高缝自动化
+- [x] `docs/DEMO_API.ps1` 无 UI 烟测
 
 ## 主数据 API（摘要）
 

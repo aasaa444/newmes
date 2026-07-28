@@ -1,8 +1,9 @@
 # MES 第一期 — 单厂离散电子组装试点
 
-**Status:** ready-for-agent  
+**Status:** accepted (phase 1 complete — tickets 01–07)  
 **Parent:** grill-with-docs 会话共识 + `CONTEXT.md` + `docs/adr/0001`–`0005`  
-**Seam (测试最高缝):** 种子数据 → 工单下达/领料 API → 工位过站 API → 完工入库 API → 谱系查询 / 审计查询 / ERP 回写出站日志
+**Seam (测试最高缝):** 种子数据 → 工单下达/领料 API → 工位过站 API → 完工入库 API → 谱系查询 / 审计查询 / ERP 回写出站日志  
+**Acceptance evidence:** `docs/PHASE1_ACCEPTANCE.md`, `docs/DEMO.md`, `Phase1E2eSeamTests`
 
 ---
 
