@@ -4,10 +4,15 @@
 
 **Blocked by:** 02 — 管理端经典壳（侧栏五菜单 + 顶栏）
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] 总览 API（或等价读模型）返回五块，数据来自执行事实
-- [ ] 今日流量指标按自然日口径
-- [ ] 在制含总数及按工序分布，可支撑下钻
-- [ ] UI 五块展示 + 下钻到在制/异常/工单入口
-- [ ] 无总览权限者不可读总览 API；有自动化断言
+- [x] 总览 API（或等价读模型）返回五块，数据来自执行事实
+- [x] 今日流量指标按自然日口径
+- [x] 在制含总数及按工序分布，可支撑下钻
+- [x] UI 五块展示 + 下钻到在制/异常/工单入口
+- [x] 无总览权限者不可读总览 API；有自动化断言
+
+## Answer
+
+OpsOverviewService aggregates five blocks from execution facts (today local date window): wip total + per-step distribution, today qualified receipts, today scraps, isolated pending, orders in-process / released-not-started. Drill APIs /api/ops/wip?processStepId, /api/ops/orders?bucket, /api/quality/isolated. OpsOverviewRead policy. Management overview tiles + drill panels (wip/isolated/orders) with step filter chips. 60/60 tests green.
+

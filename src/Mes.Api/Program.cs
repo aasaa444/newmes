@@ -26,6 +26,7 @@ builder.Services.AddScoped<StationPassService>(); // 过站、防跳站、关键
 builder.Services.AddScoped<QualityService>(); // 不合格/隔离/返工/报废/放行
 builder.Services.AddScoped<ErpWritebackSimulator>(); // ERP 出站模拟
 builder.Services.AddScoped<CompletionService>(); // 完工入库 / 关单
+builder.Services.AddScoped<OpsOverviewService>(); // 经营总览（票 03）
 
 var connectionString = builder.Configuration.GetConnectionString("MesDb")
     ?? "Server=(localdb)\\MSSQLLocalDB;Database=MesDb;Trusted_Connection=True;TrustServerCertificate=True";
@@ -231,6 +232,9 @@ app.MapStationPassEndpoints();
 
 // 票 06：完工入库、成品仓、关单、ERP 出站
 app.MapCompletionEndpoints();
+
+// 票 03：经营总览五块 + 下钻
+app.MapOpsOverviewEndpoints();
 
 app.Run();
 
