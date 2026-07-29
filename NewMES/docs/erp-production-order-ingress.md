@@ -25,13 +25,15 @@ Ticket 04 实现 ERP 计划权威进入 MES 执行域的第一条正式契约。
 
 ## 幂等与冲突
 
-Inbox 以 `SourceSystem + MessageId` 唯一标识消息，并保存消息类型、业务键、来源版本、契约版本、完整原始 JSON、原文 SHA-256 校验值、处理状态、HTTP 状态和业务结果。未知扩展字段也属于原始载荷；同一消息 ID 下任何原文差异都会形成冲突，不会被模型绑定静默丢弃。
+Inbox 以 `SourceSystem + MessageId` 唯一标识消息，并保存消息类型、业务键、来源版本、契约版本、完整原始 JSON、原文 SHA-256 校验值、处理状态、HTTP 状态和业务结果。未知扩展字段也属于原始载荷；同一消息 ID 下任何原文差异都会形成冲突，不会被模型绑定静默丢弃。具备可靠 `SourceSystem + MessageId`、但业务键或版本字段缺失的报文仍会形成可查询的 `Rejected` Inbox，缺失字段保留为 `null`，不伪造占位值。
 
 - 首次有效消息在一个 SQL Server 事务中写入 Inbox、`Received` 工单和成功审计。
 - 完全相同的消息重投直接返回 Inbox 中的首次结果，不产生新工单或审计。
 - 同一消息 ID 的载荷不同返回 `INBOUND_IDEMPOTENCY_CONFLICT`，并在冲突表保存首次和本次载荷校验值。
 - 同一 ERP 业务键使用新消息提交时返回 `PRODUCTION_ORDER_CHANGE_REQUIRED`，不覆盖现有工单；受控变更属于 Ticket 05。
 - 使用至少一次投递和幂等消费语义，不宣称严格 exactly-once。
+
+新消息以 `SHA-256-RAW-V1` 标记原始 JSON 哈希。由 `004` 结构升级的旧消息以 `SHA-256-DTO-V1` 标记原 DTO 规范化哈希；重投时按记录自身的哈希语义比较，避免升级后把同一报文误判为冲突。
 
 ## 载荷安全与保留
 

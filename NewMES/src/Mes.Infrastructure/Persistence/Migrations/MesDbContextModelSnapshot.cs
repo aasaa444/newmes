@@ -264,12 +264,10 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("BusinessKey")
-                        .IsRequired()
                         .HasMaxLength(160)
                         .HasColumnType("nvarchar(160)");
 
                     b.Property<string>("ContractVersion")
-                        .IsRequired()
                         .HasMaxLength(32)
                         .HasColumnType("nvarchar(32)");
 
@@ -324,7 +322,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(80)");
 
                     b.Property<string>("SourceVersion")
-                        .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 

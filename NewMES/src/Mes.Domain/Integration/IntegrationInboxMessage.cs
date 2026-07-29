@@ -12,11 +12,11 @@ public sealed class IntegrationInboxMessage
 
     public required string MessageType { get; init; }
 
-    public required string BusinessKey { get; init; }
+    public string? BusinessKey { get; init; }
 
-    public required string SourceVersion { get; init; }
+    public string? SourceVersion { get; init; }
 
-    public required string ContractVersion { get; init; }
+    public string? ContractVersion { get; init; }
 
     public required string PayloadHash { get; init; }
 

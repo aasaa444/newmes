@@ -4,6 +4,7 @@ using Mes.Infrastructure.Security;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
+using Mes.Domain.Integration;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +24,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.CapabilityRolesAuditContext,
         MesMigrationIds.IdempotentProductionOrderIngress,
         MesMigrationIds.PreserveErpIngressEvidence,
+        MesMigrationIds.PreserveRejectedIngressGaps,
     ];
 
     [SqlServerFact]
@@ -74,6 +76,36 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             .Select(order => order.SourceVersion)
             .SingleAsync());
         Assert.False(await context.ManufacturingEvents.AnyAsync());
+    }
+
+    [SqlServerFact]
+    public async Task LegacyIngressHashIsTaggedWithoutInventingMissingRawPayload()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(MesMigrationIds.IdempotentProductionOrderIngress);
+        var inboxId = Guid.NewGuid();
+        await context.Database.ExecuteSqlInterpolatedAsync($$"""
+            INSERT INTO [integration].[IntegrationInboxMessages]
+                ([Id], [SourceSystem], [MessageId], [BusinessKey], [SourceVersion],
+                 [ContractVersion], [PayloadHash], [PayloadHashAlgorithm], [Status],
+                 [ResultCode], [ResultMessage], [HttpStatusCode], [ReceivedAtUtc],
+                 [ProcessedAtUtc], [ProductionOrderId])
+            VALUES
+                ({{inboxId}}, N'ERP-U8', N'MSG-LEGACY-HASH-04', N'PO-LEGACY-HASH-04', N'7',
+                 N'1.0', REPLICATE('0', 64), N'SHA-256', N'Rejected',
+                 N'MATERIAL_NOT_FOUND', N'旧版拒绝', 422, SYSUTCDATETIME(),
+                 SYSUTCDATETIME(), NULL);
+            """);
+
+        await context.Database.MigrateAsync();
+
+        var inbox = await context.IntegrationInboxMessages
+            .AsNoTracking()
+            .SingleAsync(message => message.Id == inboxId);
+        Assert.Equal("SHA-256-DTO-V1", inbox.PayloadHashAlgorithm);
+        Assert.Null(inbox.PayloadJson);
+        Assert.Equal(IntegrationInboxStatus.Rejected, inbox.Status);
     }
 
     [SqlServerFact]

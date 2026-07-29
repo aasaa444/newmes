@@ -14,4 +14,7 @@ public static class MesMigrationIds
 
     public const string PreserveErpIngressEvidence =
         "20260729140931_PreserveErpIngressEvidence";
+
+    public const string PreserveRejectedIngressGaps =
+        "20260729150000_PreserveRejectedIngressGaps";
 }

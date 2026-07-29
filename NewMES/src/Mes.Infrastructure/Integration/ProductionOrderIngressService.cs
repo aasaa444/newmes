@@ -18,6 +18,8 @@ public sealed class ProductionOrderIngressService(
     TimeProvider timeProvider)
 {
     private const string MessageType = "ProductionOrderUpsert";
+    private const string LegacyDtoHashAlgorithm = "SHA-256-DTO-V1";
+    private const string RawPayloadHashAlgorithm = "SHA-256-RAW-V1";
     private const string AcceptedCode = "PRODUCTION_ORDER_ACCEPTED";
     private const string AcceptedMessage = "生产订单已接收，可由计划员检查后下达。";
     private const string ConflictCode = "INBOUND_IDEMPOTENCY_CONFLICT";
@@ -47,12 +49,15 @@ public sealed class ProductionOrderIngressService(
         string correlationId,
         CancellationToken cancellationToken = default)
     {
+        var businessObjectId = string.IsNullOrWhiteSpace(request.BusinessKey)
+            ? request.MessageId
+            : request.BusinessKey;
         await identityAccess.DemandCapabilityAsync(
             actor,
             BusinessCapability.ProductionOrderManage,
             "ERP_PRODUCTION_ORDER_INGRESS",
             "ProductionOrder",
-            request.BusinessKey,
+            businessObjectId,
             correlationId,
             cancellationToken);
 
@@ -94,9 +99,12 @@ public sealed class ProductionOrderIngressService(
                     cancellationToken);
             if (existing is not null)
             {
+                var observedHash = UsesLegacyDtoHash(existing)
+                    ? ComputePayloadHash(JsonSerializer.Serialize(request))
+                    : payloadHash;
                 if (!string.Equals(
                         existing.PayloadHash,
-                        payloadHash,
+                        observedHash,
                         StringComparison.Ordinal))
                 {
                     var conflictAt = timeProvider.GetUtcNow();
@@ -105,7 +113,7 @@ public sealed class ProductionOrderIngressService(
                         Id = Guid.NewGuid(),
                         InboxMessageId = existing.Id,
                         ExistingPayloadHash = existing.PayloadHash,
-                        ObservedPayloadHash = payloadHash,
+                        ObservedPayloadHash = observedHash,
                         ResultCode = ConflictCode,
                         ResultMessage = ConflictMessage,
                         OccurredAtUtc = conflictAt,
@@ -117,7 +125,7 @@ public sealed class ProductionOrderIngressService(
                         BusinessCapability.ProductionOrderManage,
                         "ERP_PRODUCTION_ORDER_INGRESS",
                         "ProductionOrder",
-                        request.BusinessKey,
+                        businessObjectId,
                         BusinessAuditResult.Denied,
                         ConflictCode,
                         correlationId));
@@ -195,27 +203,17 @@ public sealed class ProductionOrderIngressService(
                 SourceReference = request.BusinessKey,
                 SourceVersion = request.SourceVersion,
             };
-            var inbox = new IntegrationInboxMessage
-            {
-                Id = Guid.NewGuid(),
-                SourceSystem = request.SourceSystem,
-                MessageId = request.MessageId,
-                MessageType = MessageType,
-                BusinessKey = request.BusinessKey,
-                SourceVersion = request.SourceVersion,
-                ContractVersion = request.ContractVersion,
-                PayloadHash = payloadHash,
-                PayloadHashAlgorithm = "SHA-256",
-                PayloadJson = payloadJson,
-                Status = IntegrationInboxStatus.Accepted,
-                ResultCode = AcceptedCode,
-                ResultMessage = AcceptedMessage,
-                HttpStatusCode = 200,
-                ReceivedAtUtc = now,
-                ProcessedAtUtc = now,
-                ProductionOrderId = order.Id,
-                ProductionOrder = order,
-            };
+            var inbox = CreateInbox(
+                request,
+                payloadJson,
+                payloadHash,
+                IntegrationInboxStatus.Accepted,
+                AcceptedCode,
+                AcceptedMessage,
+                200,
+                order.Id,
+                order,
+                now);
             context.ProductionOrders.Add(order);
             context.IntegrationInboxMessages.Add(inbox);
             auditWriter.Append(new BusinessAuditWrite(
@@ -224,7 +222,7 @@ public sealed class ProductionOrderIngressService(
                 BusinessCapability.ProductionOrderManage,
                 "ERP_PRODUCTION_ORDER_INGRESS",
                 "ProductionOrder",
-                request.BusinessKey,
+                businessObjectId,
                 BusinessAuditResult.Succeeded,
                 null,
                 correlationId));
@@ -236,6 +234,17 @@ public sealed class ProductionOrderIngressService(
 
     private static string ComputePayloadHash(string payloadJson) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payloadJson)));
+
+    private static bool UsesLegacyDtoHash(IntegrationInboxMessage message) =>
+        string.Equals(
+            message.PayloadHashAlgorithm,
+            LegacyDtoHashAlgorithm,
+            StringComparison.Ordinal)
+        || (string.Equals(
+                message.PayloadHashAlgorithm,
+                "SHA-256",
+                StringComparison.Ordinal)
+            && message.PayloadJson is null);
 
     private static ProductionOrderIngressResult ToResult(IntegrationInboxMessage message) =>
         new(
@@ -271,7 +280,44 @@ public sealed class ProductionOrderIngressService(
         string correlationId)
     {
         var rejectedAt = timeProvider.GetUtcNow();
-        var rejected = new IntegrationInboxMessage
+        var rejected = CreateInbox(
+            request,
+            payloadJson,
+            payloadHash,
+            IntegrationInboxStatus.Rejected,
+            rejection.Code,
+            rejection.Message,
+            rejection.HttpStatusCode,
+            productionOrderId,
+            null,
+            rejectedAt);
+        context.IntegrationInboxMessages.Add(rejected);
+        auditWriter.Append(new BusinessAuditWrite(
+            BusinessAuditActor.From(actor),
+            BusinessRole.Planner,
+            BusinessCapability.ProductionOrderManage,
+            "ERP_PRODUCTION_ORDER_INGRESS",
+            "ProductionOrder",
+            string.IsNullOrWhiteSpace(request.BusinessKey)
+                ? request.MessageId
+                : request.BusinessKey,
+            BusinessAuditResult.Denied,
+            rejection.Code,
+            correlationId));
+        return rejected;
+    }
+
+    private static IntegrationInboxMessage CreateInbox(
+        ProductionOrderIngressRequest request,
+        string payloadJson,
+        string payloadHash,
+        IntegrationInboxStatus status,
+        string resultCode,
+        string resultMessage,
+        int httpStatusCode,
+        Guid? productionOrderId,
+        ProductionOrder? productionOrder,
+        DateTimeOffset processedAt) => new()
         {
             Id = Guid.NewGuid(),
             SourceSystem = request.SourceSystem,
@@ -281,29 +327,17 @@ public sealed class ProductionOrderIngressService(
             SourceVersion = request.SourceVersion,
             ContractVersion = request.ContractVersion,
             PayloadHash = payloadHash,
-            PayloadHashAlgorithm = "SHA-256",
+            PayloadHashAlgorithm = RawPayloadHashAlgorithm,
             PayloadJson = payloadJson,
-            Status = IntegrationInboxStatus.Rejected,
-            ResultCode = rejection.Code,
-            ResultMessage = rejection.Message,
-            HttpStatusCode = rejection.HttpStatusCode,
-            ReceivedAtUtc = rejectedAt,
-            ProcessedAtUtc = rejectedAt,
+            Status = status,
+            ResultCode = resultCode,
+            ResultMessage = resultMessage,
+            HttpStatusCode = httpStatusCode,
+            ReceivedAtUtc = processedAt,
+            ProcessedAtUtc = processedAt,
             ProductionOrderId = productionOrderId,
+            ProductionOrder = productionOrder,
         };
-        context.IntegrationInboxMessages.Add(rejected);
-        auditWriter.Append(new BusinessAuditWrite(
-            BusinessAuditActor.From(actor),
-            BusinessRole.Planner,
-            BusinessCapability.ProductionOrderManage,
-            "ERP_PRODUCTION_ORDER_INGRESS",
-            "ProductionOrder",
-            request.BusinessKey,
-            BusinessAuditResult.Denied,
-            rejection.Code,
-            correlationId));
-        return rejected;
-    }
 
     private sealed record Rejection(string Code, string Message, int HttpStatusCode);
 }

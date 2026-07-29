@@ -4,7 +4,9 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Mes.Domain.Identity;
+using Mes.Domain.Integration;
 using Mes.Domain.MasterData;
+using Mes.Infrastructure.Integration;
 using Mes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -144,6 +146,61 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    public async Task LegacyDtoHashReplayReturnsTheStoredResultAfterEvidenceUpgrade()
+    {
+        var connectionString = await server.CreateDatabaseAsync();
+        await SeedPlannerAndMaterialAsync(connectionString);
+        var request = new ProductionOrderIngressRequest(
+            "ERP-U8",
+            "MSG-LEGACY-04",
+            "PO-LEGACY-04",
+            "7",
+            "1.0",
+            "PO-LEGACY-04",
+            "ROUTER-FG-01",
+            10);
+        var legacyPayload = JsonSerializer.Serialize(request);
+        await using (var context = CreateContext(connectionString))
+        {
+            context.IntegrationInboxMessages.Add(new IntegrationInboxMessage
+            {
+                Id = Guid.NewGuid(),
+                SourceSystem = request.SourceSystem,
+                MessageId = request.MessageId,
+                MessageType = "ProductionOrderUpsert",
+                BusinessKey = request.BusinessKey,
+                SourceVersion = request.SourceVersion,
+                ContractVersion = request.ContractVersion,
+                PayloadHash = Convert.ToHexString(
+                    SHA256.HashData(Encoding.UTF8.GetBytes(legacyPayload))),
+                PayloadHashAlgorithm = "SHA-256-DTO-V1",
+                PayloadJson = null,
+                Status = IntegrationInboxStatus.Rejected,
+                ResultCode = "MATERIAL_NOT_FOUND",
+                ResultMessage = "旧版首次拒绝结果",
+                HttpStatusCode = 422,
+                ReceivedAtUtc = DateTimeOffset.UtcNow,
+                ProcessedAtUtc = DateTimeOffset.UtcNow,
+            });
+            await context.SaveChangesAsync();
+        }
+
+        await using var factory = CreateFactory(connectionString);
+        using var client = factory.CreateClient();
+        await LoginAsync(client, "planner.04", PlannerPassword);
+        var replay = await client.PostAsJsonAsync(
+            "/api/integration/erp/production-orders",
+            request);
+
+        Assert.Equal(422, (int)replay.StatusCode);
+        var result = await replay.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("MATERIAL_NOT_FOUND", result.GetProperty("code").GetString());
+        Assert.Equal("旧版首次拒绝结果", result.GetProperty("message").GetString());
+        await using var verification = CreateContext(connectionString);
+        Assert.Single(await verification.IntegrationInboxMessages.ToArrayAsync());
+    }
+
+    [SqlServerFact]
     public async Task InvalidContractUnknownMaterialAndInvalidPayloadReturnStableActionableResults()
     {
         var connectionString = await server.CreateDatabaseAsync();
@@ -180,6 +237,19 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
                 sourceSystem: "",
                 messageId: "",
                 orderNumber: "PO-MISSING-ENVELOPE-04"));
+        var missingPersistedFields = await client.PostAsJsonAsync(
+            "/api/integration/erp/production-orders",
+            new
+            {
+                sourceSystem = "ERP-U8",
+                messageId = "MSG-MISSING-FIELDS-04",
+                businessKey = (string?)null,
+                sourceVersion = (string?)null,
+                contractVersion = "1.0",
+                orderNumber = "PO-MISSING-FIELDS-04",
+                materialCode = "ROUTER-FG-01",
+                plannedQuantity = 10,
+            });
 
         Assert.Equal(422, (int)unsupported.StatusCode);
         Assert.Equal(
@@ -203,6 +273,10 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
         Assert.Equal(
             "来源系统和消息 ID 必须填写；请由 ERP 集成负责人修正消息信封后重试。",
             envelopeResult.GetProperty("message").GetString());
+        await AssertResultAsync(
+            missingPersistedFields,
+            "PRODUCTION_ORDER_PAYLOAD_INVALID",
+            "生产订单号、业务键、来源版本、物料编码必须填写，且计划数量必须大于 0。");
 
         var workbench = await client.GetFromJsonAsync<JsonElement>(
             "/api/planning/production-orders");
@@ -210,16 +284,16 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
             .EnumerateArray()
             .Select(item => item.GetProperty("resultCode").GetString())
             .ToArray();
-        Assert.Equal(3, rejectedResults.Length);
+        Assert.Equal(4, rejectedResults.Length);
         Assert.Contains("CONTRACT_VERSION_UNSUPPORTED", rejectedResults);
         Assert.Contains("MATERIAL_NOT_FOUND", rejectedResults);
         Assert.Contains("PRODUCTION_ORDER_PAYLOAD_INVALID", rejectedResults);
 
         await using var context = CreateContext(connectionString);
-        Assert.Equal(3, await context.IntegrationInboxMessages.CountAsync());
+        Assert.Equal(4, await context.IntegrationInboxMessages.CountAsync());
         Assert.Equal(0, await context.ProductionOrders.CountAsync());
         Assert.Equal(
-            4,
+            5,
             await context.BusinessAuditRecords.CountAsync(
                 audit => audit.Action == "ERP_PRODUCTION_ORDER_INGRESS"
                     && audit.Result == Mes.Domain.Auditing.BusinessAuditResult.Denied));
