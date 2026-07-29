@@ -90,7 +90,9 @@ function filterByStep(stepId) {
       <div class="overview-tile">
         <div class="tile-label">今日合格入库</div>
         <div class="tile-num">{{ overview.todayQualifiedReceipts }}</div>
-        <div class="tile-sub muted">{{ overview.windowStart | date('MM-DD') }} 自然日</div>
+        <div class="tile-sub muted">
+          {{ new Date(overview.windowStart).toLocaleDateString() }} 自然日
+        </div>
       </div>
 
       <div class="overview-tile">
