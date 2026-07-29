@@ -4,6 +4,7 @@ using Mes.Infrastructure.Security;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -306,11 +307,12 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
 
         await context.Database.ExecuteSqlInterpolatedAsync($$"""
             INSERT INTO [audit].[BusinessAuditRecords]
-                ([Id], [OccurredAtUtc], [ActorUserId], [ActorUsername], [AuthorizedRole],
+                ([Id], [OccurredAtUtc], [ActorUserId], [ActorUsername], [ActorRolesSnapshot],
+                 [AuthorizedRole],
                  [Capability], [Action], [BusinessObjectType], [BusinessObjectId],
                  [Result], [ReasonCode], [CorrelationId])
             VALUES
-                ({{auditId}}, SYSDATETIMEOFFSET(), NULL, N'unknown.operator', NULL,
+                ({{auditId}}, SYSDATETIMEOFFSET(), NULL, N'unknown.operator', N'Operator', NULL,
                  N'StationExecute', N'STATION_EXECUTION_REJECTED', N'ProductUnit',
                  N'SN-REJECTED-001', N'Denied', N'IDENTITY_NOT_ACTIVE', N'audit-test-001');
             """);
@@ -370,7 +372,62 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.Contains(audit, record =>
             record.CorrelationId == "role-change-denied-001"
             && record.Result == Mes.Domain.Auditing.BusinessAuditResult.Denied
+            && record.ActorRolesSnapshot == "Operator,QualityEngineer"
             && record.Capability == BusinessCapability.AccountManage);
+        Assert.Contains(audit, record =>
+            record.CorrelationId == "audit-read-001"
+            && record.Result == Mes.Domain.Auditing.BusinessAuditResult.Succeeded
+            && record.AuthorizedRole == BusinessRole.SystemAdministrator
+            && record.Capability == BusinessCapability.BusinessAuditRead);
+    }
+
+    [SqlServerFact]
+    public async Task InitialAdministratorBootstrapIsControlledAuditedAndOneTime()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        var bootstrapper = new InitialAdministratorBootstrapper(
+            context,
+            new PasswordHasher<UserAccount>(),
+            TimeProvider.System);
+
+        await bootstrapper.BootstrapAsync(
+            "mes.admin",
+            "MES Administrator",
+            "IntegrationOnly-InitialAdmin-03!",
+            "bootstrap-001");
+        context.ChangeTracker.Clear();
+
+        var account = await context.UserAccounts
+            .Include(user => user.RoleAssignments)
+            .SingleAsync(user => user.Username == "mes.admin");
+        Assert.True(account.IsActive);
+        Assert.Equal(BusinessRole.SystemAdministrator, account.PrimaryRole);
+        Assert.Contains(
+            account.RoleAssignments,
+            assignment => assignment.Role == BusinessRole.SystemAdministrator);
+        Assert.NotNull(account.PasswordHash);
+        Assert.Equal(
+            PasswordVerificationResult.Success,
+            new PasswordHasher<UserAccount>().VerifyHashedPassword(
+                account,
+                account.PasswordHash,
+                "IntegrationOnly-InitialAdmin-03!"));
+        Assert.Contains(
+            await context.BusinessAuditRecords.ToArrayAsync(),
+            record => record.CorrelationId == "bootstrap-001"
+                && record.Action == "INITIAL_ADMIN_BOOTSTRAP"
+                && record.Result == Mes.Domain.Auditing.BusinessAuditResult.Succeeded);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => bootstrapper.BootstrapAsync(
+            "second.admin",
+            "Second Administrator",
+            "IntegrationOnly-SecondAdmin-03!",
+            "bootstrap-002"));
+        Assert.Equal(
+            1,
+            await context.UserRoleAssignments.CountAsync(
+                assignment => assignment.Role == BusinessRole.SystemAdministrator));
     }
 
     private static MesDbContext CreateContext(string connectionString)

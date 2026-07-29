@@ -7,6 +7,7 @@ $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("newmes-topology-" +
 $secretFileEnvironment = @{
     NEWMES_APP_CONNECTION_FILE = (Join-Path $temporaryDirectory 'app-connection')
     NEWMES_MIGRATION_CONNECTION_FILE = (Join-Path $temporaryDirectory 'migration-connection')
+    NEWMES_INITIAL_ADMIN_PASSWORD_FILE = (Join-Path $temporaryDirectory 'initial-admin-password')
     NEWMES_JWT_SIGNING_KEY_FILE = (Join-Path $temporaryDirectory 'jwt-key')
     NEWMES_SQL_SA_PASSWORD_FILE = (Join-Path $temporaryDirectory 'sql-password')
     NEWMES_TLS_CERTIFICATE_FILE = (Join-Path $temporaryDirectory 'tls-certificate')
@@ -70,6 +71,8 @@ try {
     Assert-Topology ($services.api.secrets.target -contains 'Security__JwtSigningKey') 'The signing key secret mount is missing.'
     Assert-Topology ($services.api.group_add -contains '20000') 'The API must join the dedicated secret-reader group.'
     Assert-Topology ($services.migrator.secrets.target -contains 'ConnectionStrings__MesDatabase') 'The Migration connection secret mount is missing.'
+    Assert-Topology ($services.migrator.secrets.target -contains 'InitialAdmin__Password') 'The initial administrator password secret mount is missing.'
+    Assert-Topology ($null -eq $services.migrator.environment.InitialAdmin__Password) 'The initial administrator password must not be an environment value.'
     Assert-Topology ($services.migrator.group_add -contains '20000') 'The migrator must join the dedicated secret-reader group.'
     Assert-Topology ($services.sqlserver.group_add -contains '20000') 'SQL Server must join the dedicated secret-reader group.'
     Assert-Topology ($services.proxy.secrets.target -contains 'tls_certificate') 'The TLS certificate secret mount is missing.'

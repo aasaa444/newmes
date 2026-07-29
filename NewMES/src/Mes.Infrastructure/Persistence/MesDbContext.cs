@@ -81,6 +81,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 });
             entity.HasKey(audit => audit.Id);
             entity.Property(audit => audit.ActorUsername).HasMaxLength(80);
+            entity.Property(audit => audit.ActorRolesSnapshot).HasMaxLength(400);
             entity.Property(audit => audit.AuthorizedRole)
                 .HasConversion<string>()
                 .HasMaxLength(40);

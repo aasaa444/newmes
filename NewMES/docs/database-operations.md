@@ -13,13 +13,18 @@
 1. 创建空数据库和最小权限部署账号。部署账号在迁移窗口内需要 DDL 权限，API 运行账号只保留业务运行所需 DML 权限。
 2. 通过环境变量提供连接串，连接串不得提交到仓库。
 3. 显式执行迁移。
-4. 启动 API 并验证 `/health/live` 返回成功、`/health/ready` 返回 `DB_READY`。
+4. 通过外置密码 secret 显式建立首个系统管理员；该操作只能成功一次，不开放匿名 HTTP 初始化入口。
+5. 启动 API，以首个管理员登录，并验证 `/health/live` 返回成功、`/health/ready` 返回 `DB_READY`。
 
 ```powershell
 $env:ConnectionStrings__MesDatabase = '<受控连接串>'
 dotnet run --project src\Mes.DbMigrator\Mes.DbMigrator.csproj -- migrate
+$env:InitialAdmin__Password = '<仅用于本地受控初始化；生产使用外置文件>'
+dotnet run --project src\Mes.DbMigrator\Mes.DbMigrator.csproj -- bootstrap-admin --username mes.admin --display-name 'MES Administrator'
 dotnet run --project src\Mes.Api\Mes.Api.csproj
 ```
+
+生产容器从 `/run/secrets/InitialAdmin__Password` 读取密码。不得把密码写入命令参数、脚本、日志或仓库；若数据库中已存在系统管理员或目标用户名已存在，命令记录拒绝审计并以非零状态退出。
 
 ## 非生产演示数据
 

@@ -12,6 +12,8 @@ public sealed class BusinessAuditRecord
 
     public required string ActorUsername { get; init; }
 
+    public required string ActorRolesSnapshot { get; init; }
+
     public BusinessRole? AuthorizedRole { get; init; }
 
     public BusinessCapability? Capability { get; init; }

@@ -1,6 +1,9 @@
+using Mes.Domain.Identity;
+using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Seeding;
 using Mes.Infrastructure.Security;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.DbMigrator;
@@ -37,6 +40,32 @@ public static class MigratorApplication
                 await context.Database.MigrateAsync();
                 Console.WriteLine(
                     $"Database is current at {MesMigrationIds.CapabilityRolesAuditContext}.");
+                return 0;
+            }
+
+            if (command.Operation == MigratorOperation.BootstrapAdministrator)
+            {
+                var password = Environment.GetEnvironmentVariable("InitialAdmin__Password")
+                    ?? ExternalSecretFile.ReadOptional(
+                        secretsDirectory,
+                        "InitialAdmin__Password");
+                if (string.IsNullOrWhiteSpace(password))
+                {
+                    throw new ArgumentException(
+                        "InitialAdmin__Password must be supplied through an external secret.");
+                }
+
+                var bootstrapper = new InitialAdministratorBootstrapper(
+                    context,
+                    new PasswordHasher<UserAccount>(),
+                    TimeProvider.System);
+                await bootstrapper.BootstrapAsync(
+                    command.Username!,
+                    command.DisplayName!,
+                    password,
+                    $"bootstrap-admin-{Guid.NewGuid():N}");
+                Console.WriteLine(
+                    $"Initial administrator '{command.Username}' was provisioned.");
                 return 0;
             }
 

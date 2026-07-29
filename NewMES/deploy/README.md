@@ -8,6 +8,7 @@
 
 - API 最小权限连接串；
 - Migration 专用连接串；
+- MES 首个管理员密码；
 - 至少 32 字符的随机 JWT 签名密钥；
 - SQL Server SA 初始密码；
 - 受信任的 TLS 证书和私钥。
@@ -20,6 +21,7 @@ $env:NEWMES_SQL_EDITION = 'Express'
 $env:NEWMES_SECRET_GID = '<Linux 主机 secret-reader 组的数字 GID>'
 $env:NEWMES_APP_CONNECTION_FILE = '<仓库外绝对路径>'
 $env:NEWMES_MIGRATION_CONNECTION_FILE = '<仓库外绝对路径>'
+$env:NEWMES_INITIAL_ADMIN_PASSWORD_FILE = '<仓库外绝对路径>'
 $env:NEWMES_JWT_SIGNING_KEY_FILE = '<仓库外绝对路径>'
 $env:NEWMES_SQL_SA_PASSWORD_FILE = '<仓库外绝对路径>'
 $env:NEWMES_TLS_CERTIFICATE_FILE = '<仓库外绝对路径>'
@@ -42,13 +44,15 @@ export NEWMES_SECRET_GID=20000
 1. 运行 `scripts/test-production-topology.ps1` 验证端口、网络和配置门禁。
 2. 启动 SQL Server，并按企业账号规范创建数据库、Migration 账号和 API 最小权限账号。
 3. 备份后显式执行 Migration 服务。
-4. 启动 API 与 Nginx。
-5. 使用受信任证书地址运行 HTTPS 冒烟。
+4. 全新安装显式建立首个系统管理员；该命令只允许在不存在系统管理员时成功。
+5. 启动 API 与 Nginx。
+6. 使用受信任证书地址运行 HTTPS 冒烟。
 
 ```powershell
 .\scripts\test-production-topology.ps1
 docker compose -f deploy\compose.production.yml up -d sqlserver
 docker compose -f deploy\compose.production.yml --profile operations run --rm migrator
+docker compose -f deploy\compose.production.yml --profile operations run --rm migrator bootstrap-admin --username mes.admin --display-name 'MES Administrator'
 docker compose -f deploy\compose.production.yml up -d --build api proxy
 .\scripts\test-production-deployment.ps1 -BaseUri 'https://mes.factory.example/'
 ```

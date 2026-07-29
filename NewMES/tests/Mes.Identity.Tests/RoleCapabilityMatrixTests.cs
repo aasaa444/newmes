@@ -29,10 +29,15 @@ public sealed class RoleCapabilityMatrixTests
     }
 
     [Theory]
+    [InlineData(BusinessRole.Planner, BusinessCapability.QualityDispositionApprove)]
+    [InlineData(BusinessRole.ProcessEngineer, BusinessCapability.ProductionOrderManage)]
     [InlineData(BusinessRole.Operator, BusinessCapability.QualityDispositionApprove)]
     [InlineData(BusinessRole.LineSupervisor, BusinessCapability.QualityDispositionApprove)]
+    [InlineData(BusinessRole.QualityEngineer, BusinessCapability.AccountManage)]
+    [InlineData(BusinessRole.MaterialHandler, BusinessCapability.ProductionOrderManage)]
     [InlineData(BusinessRole.SystemAdministrator, BusinessCapability.QualityHoldRelease)]
-    public void OperationalAndTechnicalRolesCannotApproveQualityDecisions(
+    [InlineData(BusinessRole.OperationsManager, BusinessCapability.StationExecute)]
+    public void EachBusinessRoleHasAnExplicitMajorDeniedPath(
         BusinessRole role,
         BusinessCapability capability)
     {

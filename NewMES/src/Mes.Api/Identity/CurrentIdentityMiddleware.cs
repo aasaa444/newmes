@@ -21,6 +21,10 @@ public sealed class CurrentIdentityMiddleware(RequestDelegate next)
                     context.RequestAborted);
                 if (!identity.IsActive)
                 {
+                    await identityAccess.RecordInactiveRequestDeniedAsync(
+                        identity,
+                        context.TraceIdentifier,
+                        context.RequestAborted);
                     context.Response.StatusCode = StatusCodes.Status401Unauthorized;
                     await context.Response.WriteAsJsonAsync(
                         new { code = "IDENTITY_NOT_ACTIVE" },

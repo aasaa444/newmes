@@ -1,6 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Mes.Domain.Auditing;
 using Mes.Domain.Identity;
 using Mes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
@@ -82,6 +83,40 @@ public sealed class IdentityApiTests(SqlServerFixture server)
             Assert.Contains(
                 response.GetProperty("capabilities").EnumerateArray(),
                 capability => capability.GetString() == "QualityDispositionApprove");
+
+            await using (var context = CreateContext(connectionString))
+            {
+                var qualityRole = await context.UserRoleAssignments.SingleAsync(
+                    assignment => assignment.UserAccountId == userId
+                        && assignment.Role == BusinessRole.QualityEngineer);
+                context.UserRoleAssignments.Remove(qualityRole);
+                await context.SaveChangesAsync();
+            }
+
+            response = await client.GetFromJsonAsync<JsonElement>("/api/identity/me");
+            Assert.DoesNotContain(
+                response.GetProperty("capabilities").EnumerateArray(),
+                capability => capability.GetString() == "QualityDispositionApprove");
+
+            await using (var context = CreateContext(connectionString))
+            {
+                var account = await context.UserAccounts.SingleAsync(user => user.Id == userId);
+                account.IsActive = false;
+                await context.SaveChangesAsync();
+            }
+
+            var inactiveResponse = await client.GetAsync("/api/identity/me");
+            Assert.Equal(System.Net.HttpStatusCode.Unauthorized, inactiveResponse.StatusCode);
+            await using (var context = CreateContext(connectionString))
+            {
+                Assert.Contains(
+                    await context.BusinessAuditRecords.ToArrayAsync(),
+                    record => record.ActorUserId == userId
+                        && record.Action == "AUTHENTICATED_REQUEST_REJECTED"
+                        && record.ActorRolesSnapshot == "Operator"
+                        && record.Result == BusinessAuditResult.Denied
+                        && record.ReasonCode == "IDENTITY_NOT_ACTIVE");
+            }
         }
         finally
         {

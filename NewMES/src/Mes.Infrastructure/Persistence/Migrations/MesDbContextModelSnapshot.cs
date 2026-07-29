@@ -41,6 +41,11 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<string>("ActorRolesSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
                     b.Property<string>("AuthorizedRole")
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");

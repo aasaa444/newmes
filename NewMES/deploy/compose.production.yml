@@ -104,6 +104,9 @@ services:
       - source: migration_connection_string
         target: ConnectionStrings__MesDatabase
         mode: 0440
+      - source: initial_admin_password
+        target: InitialAdmin__Password
+        mode: 0440
     read_only: true
     tmpfs:
       - /tmp
@@ -162,6 +165,8 @@ secrets:
     file: ${NEWMES_APP_CONNECTION_FILE:?Set NEWMES_APP_CONNECTION_FILE}
   migration_connection_string:
     file: ${NEWMES_MIGRATION_CONNECTION_FILE:?Set NEWMES_MIGRATION_CONNECTION_FILE}
+  initial_admin_password:
+    file: ${NEWMES_INITIAL_ADMIN_PASSWORD_FILE:?Set NEWMES_INITIAL_ADMIN_PASSWORD_FILE}
   jwt_signing_key:
     file: ${NEWMES_JWT_SIGNING_KEY_FILE:?Set NEWMES_JWT_SIGNING_KEY_FILE}
   sql_sa_password:

@@ -54,6 +54,10 @@ public sealed class CapabilityRolesAuditContext : Migration
                     type: "nvarchar(80)",
                     maxLength: 80,
                     nullable: false),
+                ActorRolesSnapshot = table.Column<string>(
+                    type: "nvarchar(400)",
+                    maxLength: 400,
+                    nullable: false),
                 AuthorizedRole = table.Column<string>(
                     type: "nvarchar(40)",
                     maxLength: 40,

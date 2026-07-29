@@ -8,7 +8,7 @@ public static class IdentityEndpoints
     public static IEndpointRouteBuilder MapIdentityEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapPost("/api/auth/login", LoginAsync);
-        endpoints.MapGet("/api/identity/me", GetCurrentIdentity)
+        endpoints.MapGet("/api/identity/me", GetCurrentIdentityAsync)
             .RequireAuthorization();
         endpoints.MapPut("/api/admin/accounts/{userId:guid}/roles", ChangeRolesAsync)
             .RequireAuthorization();
@@ -38,10 +38,34 @@ public static class IdentityEndpoints
             : Results.Ok(new { accessToken = tokenIssuer.Issue(identity), expiresInSeconds = 28800 });
     }
 
-    private static IResult GetCurrentIdentity(CurrentIdentityAccessor accessor) =>
-        accessor.Identity is null
-            ? Results.Unauthorized()
-            : Results.Ok(ToResponse(accessor.Identity));
+    private static async Task<IResult> GetCurrentIdentityAsync(
+        CurrentIdentityAccessor accessor,
+        IdentityAccessService identityAccess,
+        HttpContext context,
+        CancellationToken cancellationToken)
+    {
+        if (accessor.Identity is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        try
+        {
+            await identityAccess.DemandCapabilityAsync(
+                accessor.Identity,
+                BusinessCapability.IdentityContextRead,
+                "IDENTITY_CONTEXT_READ",
+                "UserAccount",
+                accessor.Identity.UserId.ToString(),
+                context.TraceIdentifier,
+                cancellationToken);
+            return Results.Ok(ToResponse(accessor.Identity));
+        }
+        catch (CapabilityDeniedException exception)
+        {
+            return Forbidden(exception);
+        }
+    }
 
     private static async Task<IResult> ChangeRolesAsync(
         Guid userId,
@@ -127,6 +151,7 @@ public static class IdentityEndpoints
                 record.OccurredAtUtc,
                 record.ActorUserId,
                 record.ActorUsername,
+                record.ActorRolesSnapshot,
                 record.AuthorizedRole,
                 record.Capability,
                 record.Action,

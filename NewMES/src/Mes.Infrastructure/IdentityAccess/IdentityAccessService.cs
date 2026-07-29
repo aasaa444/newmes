@@ -9,6 +9,8 @@ public sealed class IdentityAccessService(
     MesDbContext context,
     TimeProvider timeProvider)
 {
+    private readonly BusinessAuditWriter auditWriter = new(context, timeProvider);
+
     public async Task<EffectiveIdentity> GetRequiredIdentityAsync(
         Guid userId,
         CancellationToken cancellationToken = default)
@@ -18,19 +20,7 @@ public sealed class IdentityAccessService(
             .Include(user => user.RoleAssignments)
             .SingleOrDefaultAsync(user => user.Id == userId, cancellationToken)
             ?? throw new KeyNotFoundException("The user account does not exist.");
-        var roles = account.RoleAssignments
-            .Select(assignment => assignment.Role)
-            .Distinct()
-            .Order()
-            .ToArray();
-        return new EffectiveIdentity(
-            account.Id,
-            account.Username,
-            account.DisplayName,
-            account.IsActive,
-            account.PrimaryRole,
-            roles,
-            RoleCapabilityMatrix.GetEffectiveCapabilities(roles));
+        return EffectiveIdentityProjector.From(account);
     }
 
     public async Task ChangeRolesAsync(
@@ -51,16 +41,17 @@ public sealed class IdentityAccessService(
         var distinctRoles = roles.Distinct().Order().ToArray();
         if (distinctRoles.Length == 0 || !distinctRoles.Contains(primaryRole))
         {
-            await AddAuditAsync(
-                actor,
-                grant.GrantedByRole,
-                BusinessCapability.AccountManage,
-                "ACCOUNT_ROLES_CHANGE",
-                "UserAccount",
-                targetUserId.ToString(),
-                BusinessAuditResult.Denied,
-                "PRIMARY_ROLE_MUST_BE_ASSIGNED",
-                correlationId,
+            await AppendAuditAsync(
+                new BusinessAuditWrite(
+                    BusinessAuditActor.From(actor),
+                    grant.GrantedByRole,
+                    BusinessCapability.AccountManage,
+                    "ACCOUNT_ROLES_CHANGE",
+                    "UserAccount",
+                    targetUserId.ToString(),
+                    BusinessAuditResult.Denied,
+                    "PRIMARY_ROLE_MUST_BE_ASSIGNED",
+                    correlationId),
                 cancellationToken);
             throw new ArgumentException(
                 "The primary role must be included in the assigned roles.",
@@ -83,8 +74,8 @@ public sealed class IdentityAccessService(
             });
         }
 
-        AddAudit(
-            actor,
+        auditWriter.Append(new BusinessAuditWrite(
+            BusinessAuditActor.From(actor),
             grant.GrantedByRole,
             BusinessCapability.AccountManage,
             "ACCOUNT_ROLES_CHANGE",
@@ -92,7 +83,7 @@ public sealed class IdentityAccessService(
             targetUserId.ToString(),
             BusinessAuditResult.Succeeded,
             null,
-            correlationId);
+            correlationId));
         await context.SaveChangesAsync(cancellationToken);
     }
 
@@ -102,18 +93,68 @@ public sealed class IdentityAccessService(
         string correlationId,
         CancellationToken cancellationToken = default)
     {
-        await DemandAsync(
+        var grant = await DemandAsync(
             actor,
             BusinessCapability.BusinessAuditRead,
             "BUSINESS_AUDIT_READ",
             actor.UserId.ToString(),
             correlationId,
             cancellationToken);
+        await AppendAuditAsync(
+            new BusinessAuditWrite(
+                BusinessAuditActor.From(actor),
+                grant.GrantedByRole,
+                BusinessCapability.BusinessAuditRead,
+                "BUSINESS_AUDIT_READ",
+                "BusinessAudit",
+                actor.UserId.ToString(),
+                BusinessAuditResult.Succeeded,
+                null,
+                correlationId),
+            cancellationToken);
         return await context.BusinessAuditRecords
             .AsNoTracking()
             .OrderByDescending(audit => audit.OccurredAtUtc)
             .Take(Math.Clamp(take, 1, 200))
             .ToArrayAsync(cancellationToken);
+    }
+
+    public async Task DemandCapabilityAsync(
+        EffectiveIdentity actor,
+        BusinessCapability capability,
+        string action,
+        string objectType,
+        string objectId,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        await DemandAsync(
+            actor,
+            capability,
+            action,
+            objectId,
+            correlationId,
+            cancellationToken,
+            objectType);
+    }
+
+    public async Task RecordInactiveRequestDeniedAsync(
+        EffectiveIdentity actor,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        await AppendAuditAsync(
+            new BusinessAuditWrite(
+                BusinessAuditActor.From(actor),
+                null,
+                null,
+                "AUTHENTICATED_REQUEST_REJECTED",
+                "UserAccount",
+                actor.UserId.ToString(),
+                BusinessAuditResult.Denied,
+                "IDENTITY_NOT_ACTIVE",
+                correlationId),
+            cancellationToken);
     }
 
     public async Task SetAccountActiveAsync(
@@ -135,8 +176,8 @@ public sealed class IdentityAccessService(
             cancellationToken) ?? throw new KeyNotFoundException(
                 "The target user account does not exist.");
         target.IsActive = isActive;
-        AddAudit(
-            actor,
+        auditWriter.Append(new BusinessAuditWrite(
+            BusinessAuditActor.From(actor),
             grant.GrantedByRole,
             BusinessCapability.AccountManage,
             "ACCOUNT_STATUS_CHANGE",
@@ -144,7 +185,7 @@ public sealed class IdentityAccessService(
             targetUserId.ToString(),
             BusinessAuditResult.Succeeded,
             null,
-            correlationId);
+            correlationId));
         await context.SaveChangesAsync(cancellationToken);
     }
 
@@ -154,7 +195,8 @@ public sealed class IdentityAccessService(
         string action,
         string objectId,
         string correlationId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string objectType = "UserAccount")
     {
         var grant = actor.IsActive
             ? RoleCapabilityMatrix.Authorize(actor.Roles, capability)
@@ -164,72 +206,28 @@ public sealed class IdentityAccessService(
             return grant;
         }
 
-        await AddAuditAsync(
-            actor,
-            null,
-            capability,
-            action,
-            "UserAccount",
-            objectId,
-            BusinessAuditResult.Denied,
-            actor.IsActive ? "CAPABILITY_NOT_GRANTED" : "ACTOR_NOT_ACTIVE",
-            correlationId,
+        await AppendAuditAsync(
+            new BusinessAuditWrite(
+                BusinessAuditActor.From(actor),
+                null,
+                capability,
+                action,
+                objectType,
+                objectId,
+                BusinessAuditResult.Denied,
+                actor.IsActive ? "CAPABILITY_NOT_GRANTED" : "ACTOR_NOT_ACTIVE",
+                correlationId),
             cancellationToken);
         throw new CapabilityDeniedException(
             capability,
             actor.IsActive ? "CAPABILITY_NOT_GRANTED" : "ACTOR_NOT_ACTIVE");
     }
 
-    private async Task AddAuditAsync(
-        EffectiveIdentity actor,
-        BusinessRole? authorizedRole,
-        BusinessCapability capability,
-        string action,
-        string objectType,
-        string objectId,
-        BusinessAuditResult result,
-        string? reasonCode,
-        string correlationId,
+    private async Task AppendAuditAsync(
+        BusinessAuditWrite write,
         CancellationToken cancellationToken)
     {
-        AddAudit(
-            actor,
-            authorizedRole,
-            capability,
-            action,
-            objectType,
-            objectId,
-            result,
-            reasonCode,
-            correlationId);
+        auditWriter.Append(write);
         await context.SaveChangesAsync(cancellationToken);
-    }
-
-    private void AddAudit(
-        EffectiveIdentity actor,
-        BusinessRole? authorizedRole,
-        BusinessCapability capability,
-        string action,
-        string objectType,
-        string objectId,
-        BusinessAuditResult result,
-        string? reasonCode,
-        string correlationId)
-    {
-        context.BusinessAuditRecords.Add(new BusinessAuditRecord
-        {
-            Id = Guid.NewGuid(),
-            OccurredAtUtc = timeProvider.GetUtcNow(),
-            ActorUserId = actor.UserId,
-            ActorUsername = actor.Username,
-            AuthorizedRole = authorizedRole,
-            Capability = capability,
-            Action = action,
-            BusinessObjectType = objectType,
-            BusinessObjectId = objectId,
-            Result = result,
-            ReasonCode = reasonCode,
-            CorrelationId = correlationId,
-        });
     }
 }

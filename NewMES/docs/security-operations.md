@@ -24,7 +24,7 @@
 
 ## 外置秘密
 
-以下文件放在仓库和镜像之外，只允许部署账号和无登录权限的专用容器 secret-reader 组读取：API 连接串、Migration 连接串、JWT 签名密钥、SQL 管理员初始密码、TLS 证书和私钥。宿主文件必须属于 `NEWMES_SECRET_GID` 指定的数字组并设置为 `0440`；Compose 通过 `group_add` 让非 root 进程读取各自挂载的文件。文件路径通过 `NEWMES_*_FILE` 环境变量交给 Compose，秘密内容不作为环境变量传入容器。
+以下文件放在仓库和镜像之外，只允许部署账号和无登录权限的专用容器 secret-reader 组读取：API 连接串、Migration 连接串、JWT 签名密钥、MES 首个管理员密码、SQL 管理员初始密码、TLS 证书和私钥。宿主文件必须属于 `NEWMES_SECRET_GID` 指定的数字组并设置为 `0440`；Compose 通过 `group_add` 让非 root 进程读取各自挂载的文件。文件路径通过 `NEWMES_*_FILE` 环境变量交给 Compose，秘密内容不作为环境变量传入容器。
 
 - JWT 签名密钥至少 32 个随机字符，不得包含 `demo`、`sample`、`changeme` 等示例标记。
 - 轮换数据库凭据时，先创建新凭据并验证就绪，再撤销旧凭据；不要原地覆盖后直接删除回退路径。
@@ -36,8 +36,9 @@
 1. 执行 `scripts/test-production-topology.ps1`，确认端口隔离、生产环境、外置 secret 和日志轮转配置。
 2. 检查最近一次可恢复备份；升级前额外执行一次完整备份。
 3. 单独启动 SQL Server，在维护窗口运行 `Mes.DbMigrator migrate`。
-4. Migration 成功后启动 API 和 Nginx；失败则保持 API 隔离，不修改迁移历史。
-5. 对受信任 HTTPS 地址执行 `scripts/test-production-deployment.ps1`。
+4. 全新安装显式运行一次 `Mes.DbMigrator bootstrap-admin`；重复执行会拒绝并审计。
+5. Migration 和首个管理员初始化成功后启动 API 和 Nginx；失败则保持 API 隔离，不修改迁移历史。
+6. 对受信任 HTTPS 地址执行 `scripts/test-production-deployment.ps1`。
 
 完整命令见 [部署说明](../deploy/README.md)，数据库迁移与回退边界见 [数据库运维](database-operations.md)。
 
@@ -53,7 +54,7 @@
 
 API 在 Production 输出 JSON 日志；Nginx 输出 JSON access log。两者只记录关联 ID、方法、路径、状态和耗时等运维字段，不记录 Authorization、密码或查询参数。Compose 将每个容器日志限制为 10 MB、保留 5 份；生产主机仍需将日志转存到受控介质并按工厂制度设置访问权限和保留期。
 
-技术日志不替代制造事件和业务审计。制造事实继续进入追加式制造事件存储；业务审计能力在对应领域 Ticket 实现前不得宣称已交付。
+技术日志不替代制造事件和业务审计。制造事实继续进入追加式制造事件存储；身份、角色、账号管理和授权拒绝进入 Ticket 03 建立的追加式业务审计，后续制造领域 Ticket 仍需为各自关键动作接入同一审计上下文。
 
 ## 备份与恢复演练
 

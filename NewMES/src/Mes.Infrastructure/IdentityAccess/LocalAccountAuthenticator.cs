@@ -11,6 +11,8 @@ public sealed class LocalAccountAuthenticator(
     IPasswordHasher<UserAccount> passwordHasher,
     TimeProvider timeProvider)
 {
+    private readonly BusinessAuditWriter auditWriter = new(context, timeProvider);
+
     public async Task<EffectiveIdentity?> AuthenticateAsync(
         string username,
         string password,
@@ -30,36 +32,25 @@ public sealed class LocalAccountAuthenticator(
                 account,
                 account.PasswordHash,
                 password) != PasswordVerificationResult.Failed;
-        context.BusinessAuditRecords.Add(new BusinessAuditRecord
-        {
-            Id = Guid.NewGuid(),
-            OccurredAtUtc = timeProvider.GetUtcNow(),
-            ActorUserId = account?.Id,
-            ActorUsername = normalizedUsername,
-            Action = "LOCAL_LOGIN",
-            BusinessObjectType = "UserAccount",
-            BusinessObjectId = account?.Id.ToString() ?? normalizedUsername,
-            Result = verified ? BusinessAuditResult.Succeeded : BusinessAuditResult.Denied,
-            ReasonCode = verified ? null : "INVALID_CREDENTIALS_OR_INACTIVE_ACCOUNT",
-            CorrelationId = correlationId,
-        });
+        auditWriter.Append(new BusinessAuditWrite(
+            new BusinessAuditActor(
+                account?.Id,
+                normalizedUsername,
+                account?.RoleAssignments.Select(assignment => assignment.Role).ToArray() ?? []),
+            null,
+            null,
+            "LOCAL_LOGIN",
+            "UserAccount",
+            account?.Id.ToString() ?? normalizedUsername,
+            verified ? BusinessAuditResult.Succeeded : BusinessAuditResult.Denied,
+            verified ? null : "INVALID_CREDENTIALS_OR_INACTIVE_ACCOUNT",
+            correlationId));
         await context.SaveChangesAsync(cancellationToken);
         if (!verified || account is null)
         {
             return null;
         }
 
-        var roles = account.RoleAssignments.Select(assignment => assignment.Role)
-            .Distinct()
-            .Order()
-            .ToArray();
-        return new EffectiveIdentity(
-            account.Id,
-            account.Username,
-            account.DisplayName,
-            account.IsActive,
-            account.PrimaryRole,
-            roles,
-            RoleCapabilityMatrix.GetEffectiveCapabilities(roles));
+        return EffectiveIdentityProjector.From(account);
     }
 }
