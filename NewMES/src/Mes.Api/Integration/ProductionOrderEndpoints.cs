@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Mes.Api.Identity;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Integration;
@@ -30,7 +31,7 @@ public static class ProductionOrderEndpoints
     }
 
     private static async Task<IResult> ReceiveAsync(
-        ProductionOrderIngressRequest request,
+        JsonElement payload,
         CurrentIdentityAccessor accessor,
         ProductionOrderIngressService ingress,
         HttpContext context,
@@ -43,9 +44,22 @@ public static class ProductionOrderEndpoints
 
         try
         {
+            var request = payload.Deserialize<ProductionOrderIngressRequest>(
+                JsonSerializerOptions.Web);
+            if (request is null)
+            {
+                return Results.BadRequest(new
+                {
+                    status = "Rejected",
+                    code = "INBOUND_ENVELOPE_INVALID",
+                    message = "生产订单入站报文必须是 JSON 对象；请由 ERP 集成负责人修正消息信封后重试。",
+                });
+            }
+
             var result = await ingress.ReceiveAsync(
                 accessor.Identity,
                 request,
+                payload.GetRawText(),
                 context.TraceIdentifier,
                 cancellationToken);
             return Results.Json(result, statusCode: result.HttpStatusCode);
@@ -58,7 +72,7 @@ public static class ProductionOrderEndpoints
 
     private static async Task<IResult> ReadWorkbenchAsync(
         CurrentIdentityAccessor accessor,
-        ProductionOrderIngressService ingress,
+        ProductionOrderWorkbenchQueryService workbench,
         HttpContext context,
         CancellationToken cancellationToken)
     {
@@ -69,7 +83,7 @@ public static class ProductionOrderEndpoints
 
         try
         {
-            return Results.Ok(await ingress.ReadWorkbenchAsync(
+            return Results.Ok(await workbench.ReadAsync(
                 accessor.Identity,
                 context.TraceIdentifier,
                 cancellationToken));

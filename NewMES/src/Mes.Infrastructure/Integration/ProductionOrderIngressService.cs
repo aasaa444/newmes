@@ -17,6 +17,7 @@ public sealed class ProductionOrderIngressService(
     IdentityAccessService identityAccess,
     TimeProvider timeProvider)
 {
+    private const string MessageType = "ProductionOrderUpsert";
     private const string AcceptedCode = "PRODUCTION_ORDER_ACCEPTED";
     private const string AcceptedMessage = "生产订单已接收，可由计划员检查后下达。";
     private const string ConflictCode = "INBOUND_IDEMPOTENCY_CONFLICT";
@@ -42,6 +43,7 @@ public sealed class ProductionOrderIngressService(
     public async Task<ProductionOrderIngressResult> ReceiveAsync(
         EffectiveIdentity actor,
         ProductionOrderIngressRequest request,
+        string payloadJson,
         string correlationId,
         CancellationToken cancellationToken = default)
     {
@@ -76,7 +78,7 @@ public sealed class ProductionOrderIngressService(
                 400);
         }
 
-        var payloadHash = ComputePayloadHash(request);
+        var payloadHash = ComputePayloadHash(payloadJson);
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -149,6 +151,7 @@ public sealed class ProductionOrderIngressService(
                 var rejected = AppendRejectedInbox(
                     actor,
                     request,
+                    payloadJson,
                     payloadHash,
                     rejection,
                     null,
@@ -169,6 +172,7 @@ public sealed class ProductionOrderIngressService(
                 var rejected = AppendRejectedInbox(
                     actor,
                     request,
+                    payloadJson,
                     payloadHash,
                     new Rejection(ChangeRequiredCode, ChangeRequiredMessage, 409),
                     existingOrder.Id,
@@ -196,11 +200,13 @@ public sealed class ProductionOrderIngressService(
                 Id = Guid.NewGuid(),
                 SourceSystem = request.SourceSystem,
                 MessageId = request.MessageId,
+                MessageType = MessageType,
                 BusinessKey = request.BusinessKey,
                 SourceVersion = request.SourceVersion,
                 ContractVersion = request.ContractVersion,
                 PayloadHash = payloadHash,
                 PayloadHashAlgorithm = "SHA-256",
+                PayloadJson = payloadJson,
                 Status = IntegrationInboxStatus.Accepted,
                 ResultCode = AcceptedCode,
                 ResultMessage = AcceptedMessage,
@@ -228,50 +234,8 @@ public sealed class ProductionOrderIngressService(
         });
     }
 
-    public async Task<IReadOnlyList<ProductionOrderWorkbenchItem>> ReadWorkbenchAsync(
-        EffectiveIdentity actor,
-        string correlationId,
-        CancellationToken cancellationToken = default)
-    {
-        await identityAccess.DemandCapabilityAsync(
-            actor,
-            BusinessCapability.ProductionOrderRead,
-            "PRODUCTION_ORDER_WORKBENCH_READ",
-            "ProductionOrder",
-            actor.UserId.ToString(),
-            correlationId,
-            cancellationToken);
-
-        return await context.ProductionOrders
-            .AsNoTracking()
-            .OrderByDescending(order => order.CreatedAtUtc)
-            .Select(order => new ProductionOrderWorkbenchItem(
-                order.Id,
-                order.OrderNumber,
-                order.Material!.Code,
-                order.PlannedQuantity,
-                order.Status.ToString(),
-                order.SourceSystem,
-                order.SourceReference,
-                order.SourceVersion,
-                context.IntegrationInboxMessages
-                    .Where(message => message.ProductionOrderId == order.Id)
-                    .OrderByDescending(message => message.ProcessedAtUtc)
-                    .Select(message => message.Status.ToString())
-                    .FirstOrDefault(),
-                context.IntegrationInboxMessages
-                    .Where(message => message.ProductionOrderId == order.Id)
-                    .OrderByDescending(message => message.ProcessedAtUtc)
-                    .Select(message => message.ResultCode)
-                    .FirstOrDefault()))
-            .ToArrayAsync(cancellationToken);
-    }
-
-    private static string ComputePayloadHash(ProductionOrderIngressRequest request)
-    {
-        var payload = JsonSerializer.Serialize(request);
-        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
-    }
+    private static string ComputePayloadHash(string payloadJson) =>
+        Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payloadJson)));
 
     private static ProductionOrderIngressResult ToResult(IntegrationInboxMessage message) =>
         new(
@@ -300,6 +264,7 @@ public sealed class ProductionOrderIngressService(
     private IntegrationInboxMessage AppendRejectedInbox(
         EffectiveIdentity actor,
         ProductionOrderIngressRequest request,
+        string payloadJson,
         string payloadHash,
         Rejection rejection,
         Guid? productionOrderId,
@@ -311,11 +276,13 @@ public sealed class ProductionOrderIngressService(
             Id = Guid.NewGuid(),
             SourceSystem = request.SourceSystem,
             MessageId = request.MessageId,
+            MessageType = MessageType,
             BusinessKey = request.BusinessKey,
             SourceVersion = request.SourceVersion,
             ContractVersion = request.ContractVersion,
             PayloadHash = payloadHash,
             PayloadHashAlgorithm = "SHA-256",
+            PayloadJson = payloadJson,
             Status = IntegrationInboxStatus.Rejected,
             ResultCode = rejection.Code,
             ResultMessage = rejection.Message,

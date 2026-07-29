@@ -11,4 +11,7 @@ public static class MesMigrationIds
 
     public const string IdempotentProductionOrderIngress =
         "20260729000400_IdempotentProductionOrderIngress";
+
+    public const string PreserveErpIngressEvidence =
+        "20260729140931_PreserveErpIngressEvidence";
 }

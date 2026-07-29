@@ -60,6 +60,7 @@ builder.Services.AddScoped<CurrentIdentityAccessor>();
 builder.Services.AddScoped<IdentityAccessService>();
 builder.Services.AddScoped<LocalAccountAuthenticator>();
 builder.Services.AddScoped<ProductionOrderIngressService>();
+builder.Services.AddScoped<ProductionOrderWorkbenchQueryService>();
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<JwtTokenIssuer>();

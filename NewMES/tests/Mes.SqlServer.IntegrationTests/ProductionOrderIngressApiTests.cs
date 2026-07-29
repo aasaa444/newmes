@@ -1,5 +1,7 @@
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Mes.Domain.Identity;
 using Mes.Domain.MasterData;
@@ -47,7 +49,7 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
 
         var workbench = await client.GetFromJsonAsync<JsonElement>(
             "/api/planning/production-orders");
-        var order = Assert.Single(workbench.EnumerateArray());
+        var order = Assert.Single(workbench.GetProperty("orders").EnumerateArray());
         Assert.Equal("PO-ERP-0401", order.GetProperty("orderNumber").GetString());
         Assert.Equal("Received", order.GetProperty("status").GetString());
         Assert.Equal("7", order.GetProperty("sourceVersion").GetString());
@@ -55,9 +57,21 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
         Assert.Equal(
             "PRODUCTION_ORDER_ACCEPTED",
             order.GetProperty("inboundResultCode").GetString());
+        var inboundResult = Assert.Single(
+            workbench.GetProperty("inboundResults").EnumerateArray());
+        Assert.Equal("ProductionOrderUpsert", inboundResult.GetProperty("messageType").GetString());
+        Assert.Equal("Accepted", inboundResult.GetProperty("status").GetString());
 
         await using var context = CreateContext(connectionString);
-        Assert.Equal(1, await context.IntegrationInboxMessages.CountAsync());
+        var inbox = await context.IntegrationInboxMessages.SingleAsync();
+        Assert.Equal("ProductionOrderUpsert", inbox.MessageType);
+        Assert.Equal(
+            "{\"sourceSystem\":\"ERP-U8\",\"messageId\":\"MSG-ERP-0401\",\"businessKey\":\"PO-ERP-0401\",\"sourceVersion\":\"7\",\"contractVersion\":\"1.0\",\"orderNumber\":\"PO-ERP-0401\",\"materialCode\":\"ROUTER-FG-01\",\"plannedQuantity\":10}",
+            inbox.PayloadJson);
+        var payloadJson = Assert.IsType<string>(inbox.PayloadJson);
+        Assert.Equal(
+            Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payloadJson))),
+            inbox.PayloadHash);
         Assert.Equal(1, await context.ProductionOrders.CountAsync());
         Assert.Equal(
             1,
@@ -100,6 +114,33 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
             await context.BusinessAuditRecords.CountAsync(
                 audit => audit.Action == "ERP_PRODUCTION_ORDER_INGRESS"
                     && audit.Result == Mes.Domain.Auditing.BusinessAuditResult.Denied));
+    }
+
+    [SqlServerFact]
+    public async Task UnknownSourceFieldDifferenceIsAnIdempotencyConflictAndOriginalPayloadIsRetained()
+    {
+        var connectionString = await server.CreateDatabaseAsync();
+        await SeedPlannerAndMaterialAsync(connectionString);
+        await using var factory = CreateFactory(connectionString);
+        using var client = factory.CreateClient();
+        await LoginAsync(client, "planner.04", PlannerPassword);
+        const string original =
+            "{\"sourceSystem\":\"ERP-U8\",\"messageId\":\"MSG-RAW-04\",\"businessKey\":\"PO-RAW-04\",\"sourceVersion\":\"7\",\"contractVersion\":\"1.0\",\"orderNumber\":\"PO-RAW-04\",\"materialCode\":\"ROUTER-FG-01\",\"plannedQuantity\":10,\"erpExtension\":\"A\"}";
+        const string changed =
+            "{\"sourceSystem\":\"ERP-U8\",\"messageId\":\"MSG-RAW-04\",\"businessKey\":\"PO-RAW-04\",\"sourceVersion\":\"7\",\"contractVersion\":\"1.0\",\"orderNumber\":\"PO-RAW-04\",\"materialCode\":\"ROUTER-FG-01\",\"plannedQuantity\":10,\"erpExtension\":\"B\"}";
+
+        var accepted = await client.PostAsync(
+            "/api/integration/erp/production-orders",
+            new StringContent(original, Encoding.UTF8, "application/json"));
+        var conflict = await client.PostAsync(
+            "/api/integration/erp/production-orders",
+            new StringContent(changed, Encoding.UTF8, "application/json"));
+
+        accepted.EnsureSuccessStatusCode();
+        Assert.Equal(System.Net.HttpStatusCode.Conflict, conflict.StatusCode);
+        await using var context = CreateContext(connectionString);
+        var inbox = await context.IntegrationInboxMessages.SingleAsync();
+        Assert.Equal(original, inbox.PayloadJson);
     }
 
     [SqlServerFact]
@@ -162,6 +203,17 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
         Assert.Equal(
             "来源系统和消息 ID 必须填写；请由 ERP 集成负责人修正消息信封后重试。",
             envelopeResult.GetProperty("message").GetString());
+
+        var workbench = await client.GetFromJsonAsync<JsonElement>(
+            "/api/planning/production-orders");
+        var rejectedResults = workbench.GetProperty("inboundResults")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("resultCode").GetString())
+            .ToArray();
+        Assert.Equal(3, rejectedResults.Length);
+        Assert.Contains("CONTRACT_VERSION_UNSUPPORTED", rejectedResults);
+        Assert.Contains("MATERIAL_NOT_FOUND", rejectedResults);
+        Assert.Contains("PRODUCTION_ORDER_PAYLOAD_INVALID", rejectedResults);
 
         await using var context = CreateContext(connectionString);
         Assert.Equal(3, await context.IntegrationInboxMessages.CountAsync());

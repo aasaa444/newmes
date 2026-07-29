@@ -183,11 +183,15 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasKey(message => message.Id);
             entity.Property(message => message.SourceSystem).HasMaxLength(80);
             entity.Property(message => message.MessageId).HasMaxLength(120);
+            entity.Property(message => message.MessageType).HasMaxLength(80);
             entity.Property(message => message.BusinessKey).HasMaxLength(160);
             entity.Property(message => message.SourceVersion).HasMaxLength(80);
             entity.Property(message => message.ContractVersion).HasMaxLength(32);
             entity.Property(message => message.PayloadHash).HasMaxLength(64);
             entity.Property(message => message.PayloadHashAlgorithm).HasMaxLength(16);
+            entity.Property(message => message.PayloadJson)
+                .HasColumnType("nvarchar(max)")
+                .IsRequired(false);
             entity.Property(message => message.Status)
                 .HasConversion<string>()
                 .HasMaxLength(16);

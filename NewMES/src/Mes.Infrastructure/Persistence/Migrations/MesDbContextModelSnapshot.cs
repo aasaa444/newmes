@@ -281,6 +281,11 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(120)
                         .HasColumnType("nvarchar(120)");
 
+                    b.Property<string>("MessageType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<string>("PayloadHash")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -290,6 +295,9 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(16)
                         .HasColumnType("nvarchar(16)");
+
+                    b.Property<string>("PayloadJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<DateTimeOffset>("ProcessedAtUtc")
                         .HasColumnType("datetimeoffset");

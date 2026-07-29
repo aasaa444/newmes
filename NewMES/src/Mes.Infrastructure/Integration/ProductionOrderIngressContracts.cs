@@ -30,3 +30,21 @@ public sealed record ProductionOrderWorkbenchItem(
     string? SourceVersion,
     string? InboundStatus,
     string? InboundResultCode);
+
+public sealed record ProductionOrderInboundResultItem(
+    Guid InboxMessageId,
+    string MessageType,
+    string SourceSystem,
+    string MessageId,
+    string BusinessKey,
+    string SourceVersion,
+    string ContractVersion,
+    Guid? ProductionOrderId,
+    string Status,
+    string ResultCode,
+    string ResultMessage,
+    DateTimeOffset ProcessedAtUtc);
+
+public sealed record ProductionOrderWorkbenchResult(
+    IReadOnlyList<ProductionOrderWorkbenchItem> Orders,
+    IReadOnlyList<ProductionOrderInboundResultItem> InboundResults);
