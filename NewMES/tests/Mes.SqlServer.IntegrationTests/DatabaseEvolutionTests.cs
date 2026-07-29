@@ -1,5 +1,6 @@
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Seeding;
+using Mes.Infrastructure.Security;
 using Mes.Domain.Execution;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
@@ -202,6 +203,53 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
 
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
             () => secondContext.SaveChangesAsync());
+    }
+
+    [SqlServerFact]
+    public async Task ElevatedDatabaseConnectionIsRejectedForApiRuntime()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        var probe = new SqlServerRuntimePrivilegeProbe(context);
+
+        var result = await probe.CheckAsync();
+
+        Assert.False(result.IsLeastPrivilege);
+        Assert.Contains("SEC_DATABASE_HIGH_PRIVILEGE", result.ViolationCodes);
+    }
+
+    [SqlServerFact]
+    public async Task LeastPrivilegeDatabaseUserIsAcceptedForApiRuntime()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        await context.Database.OpenConnectionAsync();
+        var isImpersonating = false;
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync("""
+                CREATE USER [mes_runtime_probe] WITHOUT LOGIN;
+                GRANT CONNECT TO [mes_runtime_probe];
+                GRANT SELECT TO [mes_runtime_probe];
+                EXECUTE AS USER = N'mes_runtime_probe';
+                """);
+            isImpersonating = true;
+            var probe = new SqlServerRuntimePrivilegeProbe(context);
+
+            var result = await probe.CheckAsync();
+
+            Assert.True(result.IsLeastPrivilege);
+            Assert.Empty(result.ViolationCodes);
+        }
+        finally
+        {
+            if (isImpersonating)
+            {
+                await context.Database.ExecuteSqlRawAsync("REVERT;");
+            }
+
+            await context.Database.ExecuteSqlRawAsync("DROP USER [mes_runtime_probe];");
+        }
     }
 
     private static MesDbContext CreateContext(string connectionString)

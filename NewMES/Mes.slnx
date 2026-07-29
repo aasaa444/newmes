@@ -7,6 +7,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Mes.Database.Tests/Mes.Database.Tests.csproj" />
+    <Project Path="tests/Mes.Security.Tests/Mes.Security.Tests.csproj" />
     <Project Path="tests/Mes.SqlServer.IntegrationTests/Mes.SqlServer.IntegrationTests.csproj" />
   </Folder>
 </Solution>

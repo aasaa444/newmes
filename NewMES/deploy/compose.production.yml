@@ -1,0 +1,164 @@
+name: newmes
+
+services:
+  proxy:
+    image: nginx:1.27.5-alpine
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+    ports:
+      - "443:443"
+    networks:
+      - edge
+      - backend
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    secrets:
+      - source: tls_certificate
+        target: tls_certificate
+        mode: 0444
+      - source: tls_private_key
+        target: tls_private_key
+        mode: 0400
+    read_only: true
+    tmpfs:
+      - /var/cache/nginx
+      - /var/run
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+    logging: &rotating-logs
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+    healthcheck:
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://127.0.0.1/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: newmes-api:${NEWMES_IMAGE_TAG:?Set NEWMES_IMAGE_TAG}
+    build:
+      context: ..
+      dockerfile: src/Mes.Api/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    expose:
+      - "8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MES_SECRETS_DIRECTORY: /run/secrets
+      Security__DeploymentMode: Production
+      Security__ExternalHttpsOnly: "true"
+      Security__SecretsSource: ExternalFiles
+      Security__DemoInitializationEnabled: "false"
+    networks:
+      - backend
+    secrets:
+      - source: app_connection_string
+        target: ConnectionStrings__MesDatabase
+        mode: 0400
+      - source: jwt_signing_key
+        target: Security__JwtSigningKey
+        mode: 0400
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *rotating-logs
+
+  migrator:
+    profiles: ["operations"]
+    image: newmes-db-migrator:${NEWMES_IMAGE_TAG:?Set NEWMES_IMAGE_TAG}
+    build:
+      context: ..
+      dockerfile: src/Mes.DbMigrator/Dockerfile
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    command: ["migrate"]
+    environment:
+      DOTNET_ENVIRONMENT: Production
+      MES_SECRETS_DIRECTORY: /run/secrets
+    networks:
+      - backend
+    secrets:
+      - source: migration_connection_string
+        target: ConnectionStrings__MesDatabase
+        mode: 0400
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    logging: *rotating-logs
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-CU19-ubuntu-22.04
+    restart: unless-stopped
+    expose:
+      - "1433"
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${NEWMES_SQL_EDITION:-Express}
+    command:
+      - /bin/bash
+      - -c
+      - |
+        export MSSQL_SA_PASSWORD="$$(cat /run/secrets/sql_sa_password)"
+        exec /opt/mssql/bin/sqlservr
+    networks:
+      - backend
+    secrets:
+      - source: sql_sa_password
+        target: sql_sa_password
+        mode: 0400
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    security_opt:
+      - no-new-privileges:true
+    logging: *rotating-logs
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$$(cat /run/secrets/sql_sa_password)" -C -Q "SELECT 1" >/dev/null
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+networks:
+  edge: {}
+  backend:
+    internal: true
+
+volumes:
+  sqlserver-data: {}
+
+secrets:
+  app_connection_string:
+    file: ${NEWMES_APP_CONNECTION_FILE:?Set NEWMES_APP_CONNECTION_FILE}
+  migration_connection_string:
+    file: ${NEWMES_MIGRATION_CONNECTION_FILE:?Set NEWMES_MIGRATION_CONNECTION_FILE}
+  jwt_signing_key:
+    file: ${NEWMES_JWT_SIGNING_KEY_FILE:?Set NEWMES_JWT_SIGNING_KEY_FILE}
+  sql_sa_password:
+    file: ${NEWMES_SQL_SA_PASSWORD_FILE:?Set NEWMES_SQL_SA_PASSWORD_FILE}
+  tls_certificate:
+    file: ${NEWMES_TLS_CERTIFICATE_FILE:?Set NEWMES_TLS_CERTIFICATE_FILE}
+  tls_private_key:
+    file: ${NEWMES_TLS_PRIVATE_KEY_FILE:?Set NEWMES_TLS_PRIVATE_KEY_FILE}

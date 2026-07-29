@@ -1,11 +1,29 @@
 using System.Text.Json;
+using Mes.Api.Observability;
 using Mes.Api.Readiness;
 using Mes.Infrastructure.Persistence;
+using Mes.Infrastructure.Security;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 var builder = WebApplication.CreateBuilder(args);
+var secretsDirectory = Environment.GetEnvironmentVariable("MES_SECRETS_DIRECTORY")
+    ?? "/run/secrets";
+builder.Configuration.AddKeyPerFile(secretsDirectory, optional: true);
+
+if (builder.Environment.IsProduction())
+{
+    builder.Logging.ClearProviders();
+    builder.Logging.AddJsonConsole(options =>
+    {
+        options.IncludeScopes = true;
+        options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+        options.UseUtcTimestamp = true;
+    });
+}
+
 var connectionString = builder.Configuration.GetConnectionString("MesDatabase");
 if (string.IsNullOrWhiteSpace(connectionString))
 {
@@ -16,12 +34,58 @@ if (string.IsNullOrWhiteSpace(connectionString))
 builder.Services.AddDbContext<MesDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 builder.Services.AddScoped<DatabaseCompatibilityChecker>();
+builder.Services.AddScoped<IRuntimeDatabasePrivilegeProbe, SqlServerRuntimePrivilegeProbe>();
+builder.Services.AddSingleton<ProductionSecurityContextProvider>();
+builder.Services.AddScoped<CorrelationContextAccessor>();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    // The API is reachable only on the private Compose network; Nginx is the trust boundary.
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy(), tags: ["live"])
-    .AddCheck<DatabaseCompatibilityHealthCheck>("database", tags: ["ready"]);
+    .AddCheck<DatabaseCompatibilityHealthCheck>("database", tags: ["ready"])
+    .AddCheck<ProductionSecurityHealthCheck>("security", tags: ["ready"]);
 builder.Services.AddHostedService<DatabaseCompatibilityStartupReporter>();
+builder.Services.AddHostedService<ProductionSecurityStartupReporter>();
+
+var configuredCorsOrigins = builder.Configuration
+    .GetSection("Security:AllowedCorsOrigins")
+    .GetChildren()
+    .Select(child => child.Value)
+    .Where(value => !string.IsNullOrWhiteSpace(value))
+    .Cast<string>()
+    .ToArray();
+var effectiveCorsOrigins = configuredCorsOrigins
+    .Where(origin => IsAllowedRuntimeCorsOrigin(origin, builder.Environment.IsProduction()))
+    .ToArray();
+if (effectiveCorsOrigins.Length > 0)
+{
+    builder.Services.AddCors(options => options.AddPolicy(
+        "ConfiguredOrigins",
+        policy => policy
+            .WithOrigins(effectiveCorsOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()));
+}
 
 var app = builder.Build();
+
+app.UseForwardedHeaders();
+if (app.Environment.IsProduction())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+
+app.UseMiddleware<CorrelationIdMiddleware>();
+if (effectiveCorsOrigins.Length > 0)
+{
+    app.UseCors("ConfiguredOrigins");
+}
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
@@ -48,7 +112,27 @@ app.MapHealthChecks("/health/ready", new HealthCheckOptions
         await context.Response.WriteAsync(JsonSerializer.Serialize(response));
     },
 });
+app.MapGet("/api/system/info", (CorrelationContextAccessor correlation) =>
+    Results.Ok(new
+    {
+        service = "NewMES.Api",
+        status = "running",
+        correlationId = correlation.CorrelationId,
+    }));
 
 app.Run();
+
+static bool IsAllowedRuntimeCorsOrigin(string origin, bool isProduction)
+{
+    if (string.Equals(origin, "*", StringComparison.Ordinal)
+        || !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+    {
+        return false;
+    }
+
+    return !isProduction
+        || (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
+            && !uri.IsLoopback);
+}
 
 public partial class Program;

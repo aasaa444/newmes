@@ -1,5 +1,6 @@
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Seeding;
+using Mes.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.DbMigrator;
@@ -11,8 +12,13 @@ public static class MigratorApplication
         try
         {
             var command = MigratorCommand.Parse(args);
+            var secretsDirectory = Environment.GetEnvironmentVariable("MES_SECRETS_DIRECTORY")
+                ?? "/run/secrets";
             var connectionString = Environment.GetEnvironmentVariable(
-                "ConnectionStrings__MesDatabase");
+                "ConnectionStrings__MesDatabase")
+                ?? ExternalSecretFile.ReadOptional(
+                    secretsDirectory,
+                    "ConnectionStrings__MesDatabase");
             if (string.IsNullOrWhiteSpace(connectionString))
             {
                 Console.Error.WriteLine(
