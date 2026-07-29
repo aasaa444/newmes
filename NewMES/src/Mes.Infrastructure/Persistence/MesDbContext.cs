@@ -1,3 +1,4 @@
+using Mes.Domain.Auditing;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
 using Mes.Domain.MasterData;
@@ -9,6 +10,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 {
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
 
+    public DbSet<UserRoleAssignment> UserRoleAssignments => Set<UserRoleAssignment>();
+
+    public DbSet<BusinessAuditRecord> BusinessAuditRecords => Set<BusinessAuditRecord>();
+
     public DbSet<Material> Materials => Set<Material>();
 
     public DbSet<ProductionOrder> ProductionOrders => Set<ProductionOrder>();
@@ -19,11 +24,88 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
     {
         modelBuilder.Entity<UserAccount>(entity =>
         {
-            entity.ToTable("UserAccounts", "security");
+            entity.ToTable(
+                "UserAccounts",
+                "security",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_UserAccounts_PrimaryRole",
+                        $"[PrimaryRole] IS NULL OR {RoleCheckSql("PrimaryRole")}");
+                    table.HasCheckConstraint(
+                        "CK_UserAccounts_PasswordHash",
+                        "[PasswordHash] IS NULL OR LEN([PasswordHash]) > 0");
+                });
             entity.HasKey(account => account.Id);
             entity.Property(account => account.Username).HasMaxLength(80);
             entity.Property(account => account.DisplayName).HasMaxLength(120);
+            entity.Property(account => account.PasswordHash).HasMaxLength(512);
+            entity.Property(account => account.PrimaryRole)
+                .HasConversion<string>()
+                .HasMaxLength(40);
             entity.HasIndex(account => account.Username).IsUnique();
+        });
+
+        modelBuilder.Entity<UserRoleAssignment>(entity =>
+        {
+            entity.ToTable(
+                "UserAccountRoles",
+                "security",
+                table => table.HasCheckConstraint(
+                    "CK_UserAccountRoles_Role",
+                    RoleCheckSql("Role")));
+            entity.HasKey(assignment => new { assignment.UserAccountId, assignment.Role });
+            entity.Property(assignment => assignment.Role)
+                .HasConversion<string>()
+                .HasMaxLength(40);
+            entity.HasOne(assignment => assignment.UserAccount)
+                .WithMany(account => account.RoleAssignments)
+                .HasForeignKey(assignment => assignment.UserAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<BusinessAuditRecord>(entity =>
+        {
+            entity.ToTable(
+                "BusinessAuditRecords",
+                "audit",
+                table =>
+                {
+                    table.HasTrigger("TR_BusinessAuditRecords_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_BusinessAuditRecords_Result",
+                        "[Result] IN ('Succeeded', 'Denied')");
+                    table.HasCheckConstraint(
+                        "CK_BusinessAuditRecords_AuthorizedRole",
+                        $"[AuthorizedRole] IS NULL OR {RoleCheckSql("AuthorizedRole")}");
+                });
+            entity.HasKey(audit => audit.Id);
+            entity.Property(audit => audit.ActorUsername).HasMaxLength(80);
+            entity.Property(audit => audit.AuthorizedRole)
+                .HasConversion<string>()
+                .HasMaxLength(40);
+            entity.Property(audit => audit.Capability)
+                .HasConversion<string>()
+                .HasMaxLength(80);
+            entity.Property(audit => audit.Action).HasMaxLength(80);
+            entity.Property(audit => audit.BusinessObjectType).HasMaxLength(80);
+            entity.Property(audit => audit.BusinessObjectId).HasMaxLength(160);
+            entity.Property(audit => audit.Result)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+            entity.Property(audit => audit.ReasonCode).HasMaxLength(80);
+            entity.Property(audit => audit.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(audit => audit.OccurredAtUtc);
+            entity.HasIndex(audit => new
+            {
+                audit.BusinessObjectType,
+                audit.BusinessObjectId,
+                audit.OccurredAtUtc,
+            });
+            entity.HasOne(audit => audit.ActorUser)
+                .WithMany()
+                .HasForeignKey(audit => audit.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Material>(entity =>
@@ -95,5 +177,13 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .HasForeignKey(manufacturingEvent => manufacturingEvent.CorrectsEventId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
+    }
+
+    private static string RoleCheckSql(string columnName)
+    {
+        var values = string.Join(
+            ", ",
+            Enum.GetNames<BusinessRole>().Select(role => $"'{role}'"));
+        return $"[{columnName}] IN ({values})";
     }
 }

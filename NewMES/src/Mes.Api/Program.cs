@@ -1,12 +1,20 @@
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Mes.Api.Identity;
 using Mes.Api.Observability;
 using Mes.Api.Readiness;
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Security;
+using Mes.Infrastructure.IdentityAccess;
+using Mes.Domain.Identity;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 var secretsDirectory = Environment.GetEnvironmentVariable("MES_SECRETS_DIRECTORY")
@@ -30,6 +38,12 @@ if (string.IsNullOrWhiteSpace(connectionString))
     throw new InvalidOperationException(
         "ConnectionStrings:MesDatabase is required; the API never creates an implicit database.");
 }
+var signingKey = builder.Configuration["Security:JwtSigningKey"];
+if (string.IsNullOrWhiteSpace(signingKey) || signingKey.Length < 32)
+{
+    throw new InvalidOperationException(
+        "Security:JwtSigningKey with at least 32 characters is required.");
+}
 
 builder.Services.AddDbContext<MesDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
@@ -40,6 +54,31 @@ builder.Services.AddSingleton(_ => new ProductionSecurityContextProvider(
     builder.Environment,
     secretsDirectory));
 builder.Services.AddScoped<CorrelationContextAccessor>();
+builder.Services.AddScoped<CurrentIdentityAccessor>();
+builder.Services.AddScoped<IdentityAccessService>();
+builder.Services.AddScoped<LocalAccountAuthenticator>();
+builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
+builder.Services.AddSingleton(TimeProvider.System);
+builder.Services.AddScoped<JwtTokenIssuer>();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.MapInboundClaims = false;
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = builder.Configuration["Authentication:Issuer"] ?? "NewMES",
+            ValidateAudience = true,
+            ValidAudience = builder.Configuration["Authentication:Audience"] ?? "NewMES.Web",
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(signingKey)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1),
+        };
+    });
+builder.Services.AddAuthorization();
+builder.Services.ConfigureHttpJsonOptions(options =>
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
     options.ForwardedHeaders =
@@ -87,6 +126,9 @@ if (app.Environment.IsProduction())
 }
 
 app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseAuthentication();
+app.UseMiddleware<CurrentIdentityMiddleware>();
+app.UseAuthorization();
 if (effectiveCorsOrigins.Length > 0)
 {
     app.UseCors("ConfiguredOrigins");
@@ -124,6 +166,7 @@ app.MapGet("/api/system/info", (CorrelationContextAccessor correlation) =>
         status = "running",
         correlationId = correlation.CorrelationId,
     }));
+app.MapIdentityEndpoints();
 
 app.Run();
 

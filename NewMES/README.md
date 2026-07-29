@@ -17,6 +17,13 @@ Ticket 02 建立了单厂私有化运行安全基线：
 - 存活与就绪检查分离；JSON 日志和响应带关联 ID，容器日志设置大小与份数上限。
 - 自动化检查覆盖解析后的 Compose 拓扑、生产配置失败条件、敏感日志边界和真实 SQL Server 权限。
 
+Ticket 03 建立了可组合角色与业务审计上下文：
+
+- 八类业务角色映射到具体能力，主角色只决定默认工作台。
+- JWT 不固化角色；账号停用和角色变更在下一次请求重新从数据库生效。
+- 登录身份、有效角色和能力可通过 API 查询，账号管理和审计查询由服务端能力控制。
+- 业务审计与制造事件分表保存，并由 SQL Server 拒绝更新和删除。
+
 ## 工程结构
 
 ```text
@@ -25,6 +32,7 @@ src/Mes.Infrastructure             EF Core 映射、迁移、兼容性检查、�
 src/Mes.DbMigrator                 受控数据库命令
 src/Mes.Api                        API 与存活/就绪检查
 tests/Mes.Database.Tests           无外部数据库的快速行为测试
+tests/Mes.Identity.Tests           角色能力矩阵与职责分离快速测试
 tests/Mes.Security.Tests           生产配置、外置 secret、日志与就绪安全测试
 tests/Mes.SqlServer.IntegrationTests 真实 SQL Server 发布门禁
 scripts                            可重复执行脚本
@@ -41,4 +49,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

@@ -1,7 +1,9 @@
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Seeding;
 using Mes.Infrastructure.Security;
+using Mes.Infrastructure.IdentityAccess;
 using Mes.Domain.Execution;
+using Mes.Domain.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -13,6 +15,13 @@ namespace Mes.SqlServer.IntegrationTests;
 [Collection(SqlServerFixtureProvider.Name)]
 public sealed class DatabaseEvolutionTests(SqlServerFixture server)
 {
+    private static readonly string[] CurrentMigrationIds =
+    [
+        MesMigrationIds.InitialFoundation,
+        MesMigrationIds.EvolutionBaseline,
+        MesMigrationIds.CapabilityRolesAuditContext,
+    ];
+
     [SqlServerFact]
     public async Task EmptyDatabaseInstallsToCurrentVersion()
     {
@@ -21,7 +30,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         await context.Database.MigrateAsync();
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(2, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(CurrentMigrationIds, await context.Database.GetAppliedMigrationsAsync());
         Assert.True(await TableExistsAsync(context, "ManufacturingEvents"));
     }
 
@@ -102,7 +111,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         await context.Database.MigrateAsync();
 
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
-        Assert.Equal(2, (await context.Database.GetAppliedMigrationsAsync()).Count());
+        Assert.Equal(CurrentMigrationIds, await context.Database.GetAppliedMigrationsAsync());
     }
 
     [SqlServerFact]
@@ -288,12 +297,106 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         }
     }
 
+    [SqlServerFact]
+    public async Task BusinessAuditIsSeparateAndAppendOnly()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        var auditId = Guid.NewGuid();
+
+        await context.Database.ExecuteSqlInterpolatedAsync($$"""
+            INSERT INTO [audit].[BusinessAuditRecords]
+                ([Id], [OccurredAtUtc], [ActorUserId], [ActorUsername], [AuthorizedRole],
+                 [Capability], [Action], [BusinessObjectType], [BusinessObjectId],
+                 [Result], [ReasonCode], [CorrelationId])
+            VALUES
+                ({{auditId}}, SYSDATETIMEOFFSET(), NULL, N'unknown.operator', NULL,
+                 N'StationExecute', N'STATION_EXECUTION_REJECTED', N'ProductUnit',
+                 N'SN-REJECTED-001', N'Denied', N'IDENTITY_NOT_ACTIVE', N'audit-test-001');
+            """);
+
+        var updateError = await Assert.ThrowsAsync<SqlException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE [audit].[BusinessAuditRecords]
+                SET [ReasonCode] = N'tampered'
+                WHERE [Id] = {{auditId}};
+                """));
+        var deleteError = await Assert.ThrowsAsync<SqlException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($$"""
+                DELETE FROM [audit].[BusinessAuditRecords] WHERE [Id] = {{auditId}};
+                """));
+
+        Assert.Equal(51002, updateError.Number);
+        Assert.Equal(51002, deleteError.Number);
+        Assert.Equal(0, await context.ManufacturingEvents.CountAsync());
+    }
+
+    [SqlServerFact]
+    public async Task RoleChangesAffectSubsequentAuthorizationAndDeniedChangesAreAudited()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        var adminId = Guid.NewGuid();
+        var operatorId = Guid.NewGuid();
+        context.UserAccounts.AddRange(
+            Account(adminId, "admin", BusinessRole.SystemAdministrator),
+            Account(operatorId, "operator", BusinessRole.Operator));
+        await context.SaveChangesAsync();
+        var service = new IdentityAccessService(context, TimeProvider.System);
+        var admin = await service.GetRequiredIdentityAsync(adminId);
+
+        await service.ChangeRolesAsync(
+            admin,
+            operatorId,
+            BusinessRole.Operator,
+            [BusinessRole.Operator, BusinessRole.QualityEngineer],
+            "role-change-001");
+        context.ChangeTracker.Clear();
+        var changedOperator = await service.GetRequiredIdentityAsync(operatorId);
+
+        Assert.Contains(
+            BusinessCapability.QualityDispositionApprove,
+            changedOperator.Capabilities);
+        Assert.Equal(BusinessRole.Operator, changedOperator.PrimaryRole);
+
+        await Assert.ThrowsAsync<CapabilityDeniedException>(() => service.ChangeRolesAsync(
+            changedOperator,
+            adminId,
+            BusinessRole.SystemAdministrator,
+            [BusinessRole.SystemAdministrator],
+            "role-change-denied-001"));
+        var audit = await service.ReadAuditAsync(admin, 20, "audit-read-001");
+
+        Assert.Contains(audit, record =>
+            record.CorrelationId == "role-change-denied-001"
+            && record.Result == Mes.Domain.Auditing.BusinessAuditResult.Denied
+            && record.Capability == BusinessCapability.AccountManage);
+    }
+
     private static MesDbContext CreateContext(string connectionString)
     {
         var options = new DbContextOptionsBuilder<MesDbContext>()
             .UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure())
             .Options;
         return new MesDbContext(options);
+    }
+
+    private static UserAccount Account(Guid id, string username, BusinessRole role)
+    {
+        var account = new UserAccount
+        {
+            Id = id,
+            Username = username,
+            DisplayName = username,
+            IsActive = true,
+            PrimaryRole = role,
+        };
+        account.RoleAssignments.Add(new UserRoleAssignment
+        {
+            UserAccountId = id,
+            Role = role,
+        });
+        return account;
     }
 
     private static async Task InsertMaterialAsync(

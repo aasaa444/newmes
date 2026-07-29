@@ -36,7 +36,7 @@ public static class MigratorApplication
                 Console.WriteLine("Applying controlled EF Core migrations...");
                 await context.Database.MigrateAsync();
                 Console.WriteLine(
-                    $"Database is current at {MesMigrationIds.EvolutionBaseline}.");
+                    $"Database is current at {MesMigrationIds.CapabilityRolesAuditContext}.");
                 return 0;
             }
 

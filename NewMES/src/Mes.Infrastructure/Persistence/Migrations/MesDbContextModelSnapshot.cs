@@ -22,6 +22,80 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Mes.Domain.Auditing.BusinessAuditRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid?>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("ActorUsername")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("AuthorizedRole")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("BusinessObjectId")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("BusinessObjectType")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Capability")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ReasonCode")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Result")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("OccurredAtUtc");
+
+                    b.HasIndex("BusinessObjectType", "BusinessObjectId", "OccurredAtUtc");
+
+                    b.ToTable("BusinessAuditRecords", "audit", t =>
+                        {
+                            t.HasTrigger("TR_BusinessAuditRecords_AppendOnly");
+
+                            t.HasCheckConstraint("CK_BusinessAuditRecords_AuthorizedRole", "[AuthorizedRole] IS NULL OR [AuthorizedRole] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
+
+                            t.HasCheckConstraint("CK_BusinessAuditRecords_Result", "[Result] IN ('Succeeded', 'Denied')");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("Mes.Domain.Execution.ManufacturingEvent", b =>
                 {
                     b.Property<Guid>("Id")
@@ -140,6 +214,14 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("PrimaryRole")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<string>("Username")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -150,7 +232,29 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.HasIndex("Username")
                         .IsUnique();
 
-                    b.ToTable("UserAccounts", "security");
+                    b.ToTable("UserAccounts", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserAccounts_PasswordHash", "[PasswordHash] IS NULL OR LEN([PasswordHash]) > 0");
+
+                            t.HasCheckConstraint("CK_UserAccounts_PrimaryRole", "[PrimaryRole] IS NULL OR [PrimaryRole] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
+                        });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
+                {
+                    b.Property<Guid>("UserAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("UserAccountId", "Role");
+
+                    b.ToTable("UserAccountRoles", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserAccountRoles_Role", "[Role] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
+                        });
                 });
 
             modelBuilder.Entity("Mes.Domain.MasterData.Material", b =>
@@ -188,6 +292,16 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Mes.Domain.Auditing.BusinessAuditRecord", b =>
+                {
+                    b.HasOne("Mes.Domain.Identity.UserAccount", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ActorUser");
+                });
+
             modelBuilder.Entity("Mes.Domain.Execution.ManufacturingEvent", b =>
                 {
                     b.HasOne("Mes.Domain.Execution.ManufacturingEvent", "CorrectsEvent")
@@ -207,6 +321,22 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("Material");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
+                {
+                    b.HasOne("Mes.Domain.Identity.UserAccount", "UserAccount")
+                        .WithMany("RoleAssignments")
+                        .HasForeignKey("UserAccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>
+                {
+                    b.Navigation("RoleAssignments");
                 });
 #pragma warning restore 612, 618
         }
