@@ -1,0 +1,342 @@
+using System.Data;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using Mes.Domain.Auditing;
+using Mes.Domain.Execution;
+using Mes.Domain.Identity;
+using Mes.Domain.Integration;
+using Mes.Infrastructure.IdentityAccess;
+using Mes.Infrastructure.Persistence;
+using Microsoft.EntityFrameworkCore;
+
+namespace Mes.Infrastructure.Integration;
+
+public sealed class ProductionOrderIngressService(
+    MesDbContext context,
+    IdentityAccessService identityAccess,
+    TimeProvider timeProvider)
+{
+    private const string AcceptedCode = "PRODUCTION_ORDER_ACCEPTED";
+    private const string AcceptedMessage = "生产订单已接收，可由计划员检查后下达。";
+    private const string ConflictCode = "INBOUND_IDEMPOTENCY_CONFLICT";
+    private const string ConflictMessage =
+        "同一来源消息 ID 的载荷与首次请求不一致；请核对 ERP 重发内容并使用新的消息 ID 提交受控变更。";
+    private const string UnsupportedContractCode = "CONTRACT_VERSION_UNSUPPORTED";
+    private const string UnsupportedContractMessage =
+        "当前仅支持生产订单入站契约 1.0；请由 ERP 集成负责人转换版本后重试。";
+    private const string InvalidPayloadCode = "PRODUCTION_ORDER_PAYLOAD_INVALID";
+    private const string InvalidPayloadMessage =
+        "生产订单号、业务键、来源版本、物料编码必须填写，且计划数量必须大于 0。";
+    private const string MaterialNotFoundCode = "MATERIAL_NOT_FOUND";
+    private const string MaterialNotFoundMessage =
+        "MES 中不存在或未启用该成品物料；请先由主数据负责人维护物料后重试。";
+    private const string InvalidEnvelopeCode = "INBOUND_ENVELOPE_INVALID";
+    private const string InvalidEnvelopeMessage =
+        "来源系统和消息 ID 必须填写；请由 ERP 集成负责人修正消息信封后重试。";
+    private const string ChangeRequiredCode = "PRODUCTION_ORDER_CHANGE_REQUIRED";
+    private const string ChangeRequiredMessage =
+        "该 ERP 生产订单已进入 MES；请由计划员按受控变更流程处理新版本，现有工单未被覆盖。";
+    private readonly BusinessAuditWriter auditWriter = new(context, timeProvider);
+
+    public async Task<ProductionOrderIngressResult> ReceiveAsync(
+        EffectiveIdentity actor,
+        ProductionOrderIngressRequest request,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        await identityAccess.DemandCapabilityAsync(
+            actor,
+            BusinessCapability.ProductionOrderManage,
+            "ERP_PRODUCTION_ORDER_INGRESS",
+            "ProductionOrder",
+            request.BusinessKey,
+            correlationId,
+            cancellationToken);
+
+        if (string.IsNullOrWhiteSpace(request.SourceSystem)
+            || string.IsNullOrWhiteSpace(request.MessageId))
+        {
+            auditWriter.Append(new BusinessAuditWrite(
+                BusinessAuditActor.From(actor),
+                BusinessRole.Planner,
+                BusinessCapability.ProductionOrderManage,
+                "ERP_PRODUCTION_ORDER_INGRESS",
+                "IntegrationMessage",
+                correlationId,
+                BusinessAuditResult.Denied,
+                InvalidEnvelopeCode,
+                correlationId));
+            await context.SaveChangesAsync(cancellationToken);
+            return new ProductionOrderIngressResult(
+                IntegrationInboxStatus.Rejected.ToString(),
+                InvalidEnvelopeCode,
+                InvalidEnvelopeMessage,
+                null,
+                400);
+        }
+
+        var payloadHash = ComputePayloadHash(request);
+        var strategy = context.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
+        {
+            context.ChangeTracker.Clear();
+            await using var transaction = await context.Database.BeginTransactionAsync(
+                IsolationLevel.Serializable,
+                cancellationToken);
+            var existing = await context.IntegrationInboxMessages
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    message => message.SourceSystem == request.SourceSystem
+                        && message.MessageId == request.MessageId,
+                    cancellationToken);
+            if (existing is not null)
+            {
+                if (!string.Equals(
+                        existing.PayloadHash,
+                        payloadHash,
+                        StringComparison.Ordinal))
+                {
+                    var conflictAt = timeProvider.GetUtcNow();
+                    context.IntegrationInboxConflicts.Add(new IntegrationInboxConflict
+                    {
+                        Id = Guid.NewGuid(),
+                        InboxMessageId = existing.Id,
+                        ExistingPayloadHash = existing.PayloadHash,
+                        ObservedPayloadHash = payloadHash,
+                        ResultCode = ConflictCode,
+                        ResultMessage = ConflictMessage,
+                        OccurredAtUtc = conflictAt,
+                        CorrelationId = correlationId,
+                    });
+                    auditWriter.Append(new BusinessAuditWrite(
+                        BusinessAuditActor.From(actor),
+                        BusinessRole.Planner,
+                        BusinessCapability.ProductionOrderManage,
+                        "ERP_PRODUCTION_ORDER_INGRESS",
+                        "ProductionOrder",
+                        request.BusinessKey,
+                        BusinessAuditResult.Denied,
+                        ConflictCode,
+                        correlationId));
+                    await context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    return new ProductionOrderIngressResult(
+                        IntegrationInboxStatus.Rejected.ToString(),
+                        ConflictCode,
+                        ConflictMessage,
+                        existing.ProductionOrderId,
+                        409);
+                }
+
+                await transaction.CommitAsync(cancellationToken);
+                return ToResult(existing);
+            }
+
+            var rejection = Validate(request);
+            var material = rejection is null
+                ? await context.Materials.SingleOrDefaultAsync(
+                    item => item.Code == request.MaterialCode && item.IsActive,
+                    cancellationToken)
+                : null;
+            if (rejection is null && material is null)
+            {
+                rejection = new Rejection(MaterialNotFoundCode, MaterialNotFoundMessage, 422);
+            }
+
+            if (rejection is not null)
+            {
+                var rejected = AppendRejectedInbox(
+                    actor,
+                    request,
+                    payloadHash,
+                    rejection,
+                    null,
+                    correlationId);
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return ToResult(rejected);
+            }
+
+            var existingOrder = await context.ProductionOrders
+                .AsNoTracking()
+                .SingleOrDefaultAsync(
+                    order => order.SourceSystem == request.SourceSystem
+                        && order.SourceReference == request.BusinessKey,
+                    cancellationToken);
+            if (existingOrder is not null)
+            {
+                var rejected = AppendRejectedInbox(
+                    actor,
+                    request,
+                    payloadHash,
+                    new Rejection(ChangeRequiredCode, ChangeRequiredMessage, 409),
+                    existingOrder.Id,
+                    correlationId);
+                await context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return ToResult(rejected);
+            }
+
+            var now = timeProvider.GetUtcNow();
+            var order = new ProductionOrder
+            {
+                Id = Guid.NewGuid(),
+                OrderNumber = request.OrderNumber,
+                MaterialId = material!.Id,
+                PlannedQuantity = request.PlannedQuantity,
+                Status = ProductionOrderStatus.Received,
+                CreatedAtUtc = now,
+                SourceSystem = request.SourceSystem,
+                SourceReference = request.BusinessKey,
+                SourceVersion = request.SourceVersion,
+            };
+            var inbox = new IntegrationInboxMessage
+            {
+                Id = Guid.NewGuid(),
+                SourceSystem = request.SourceSystem,
+                MessageId = request.MessageId,
+                BusinessKey = request.BusinessKey,
+                SourceVersion = request.SourceVersion,
+                ContractVersion = request.ContractVersion,
+                PayloadHash = payloadHash,
+                PayloadHashAlgorithm = "SHA-256",
+                Status = IntegrationInboxStatus.Accepted,
+                ResultCode = AcceptedCode,
+                ResultMessage = AcceptedMessage,
+                HttpStatusCode = 200,
+                ReceivedAtUtc = now,
+                ProcessedAtUtc = now,
+                ProductionOrderId = order.Id,
+                ProductionOrder = order,
+            };
+            context.ProductionOrders.Add(order);
+            context.IntegrationInboxMessages.Add(inbox);
+            auditWriter.Append(new BusinessAuditWrite(
+                BusinessAuditActor.From(actor),
+                BusinessRole.Planner,
+                BusinessCapability.ProductionOrderManage,
+                "ERP_PRODUCTION_ORDER_INGRESS",
+                "ProductionOrder",
+                request.BusinessKey,
+                BusinessAuditResult.Succeeded,
+                null,
+                correlationId));
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            return ToResult(inbox);
+        });
+    }
+
+    public async Task<IReadOnlyList<ProductionOrderWorkbenchItem>> ReadWorkbenchAsync(
+        EffectiveIdentity actor,
+        string correlationId,
+        CancellationToken cancellationToken = default)
+    {
+        await identityAccess.DemandCapabilityAsync(
+            actor,
+            BusinessCapability.ProductionOrderRead,
+            "PRODUCTION_ORDER_WORKBENCH_READ",
+            "ProductionOrder",
+            actor.UserId.ToString(),
+            correlationId,
+            cancellationToken);
+
+        return await context.ProductionOrders
+            .AsNoTracking()
+            .OrderByDescending(order => order.CreatedAtUtc)
+            .Select(order => new ProductionOrderWorkbenchItem(
+                order.Id,
+                order.OrderNumber,
+                order.Material!.Code,
+                order.PlannedQuantity,
+                order.Status.ToString(),
+                order.SourceSystem,
+                order.SourceReference,
+                order.SourceVersion,
+                context.IntegrationInboxMessages
+                    .Where(message => message.ProductionOrderId == order.Id)
+                    .OrderByDescending(message => message.ProcessedAtUtc)
+                    .Select(message => message.Status.ToString())
+                    .FirstOrDefault(),
+                context.IntegrationInboxMessages
+                    .Where(message => message.ProductionOrderId == order.Id)
+                    .OrderByDescending(message => message.ProcessedAtUtc)
+                    .Select(message => message.ResultCode)
+                    .FirstOrDefault()))
+            .ToArrayAsync(cancellationToken);
+    }
+
+    private static string ComputePayloadHash(ProductionOrderIngressRequest request)
+    {
+        var payload = JsonSerializer.Serialize(request);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(payload)));
+    }
+
+    private static ProductionOrderIngressResult ToResult(IntegrationInboxMessage message) =>
+        new(
+            message.Status.ToString(),
+            message.ResultCode,
+            message.ResultMessage,
+            message.ProductionOrderId,
+            message.HttpStatusCode);
+
+    private static Rejection? Validate(ProductionOrderIngressRequest request)
+    {
+        if (!string.Equals(request.ContractVersion, "1.0", StringComparison.Ordinal))
+        {
+            return new Rejection(UnsupportedContractCode, UnsupportedContractMessage, 422);
+        }
+
+        return string.IsNullOrWhiteSpace(request.OrderNumber)
+            || string.IsNullOrWhiteSpace(request.BusinessKey)
+            || string.IsNullOrWhiteSpace(request.SourceVersion)
+            || string.IsNullOrWhiteSpace(request.MaterialCode)
+            || request.PlannedQuantity <= 0
+                ? new Rejection(InvalidPayloadCode, InvalidPayloadMessage, 422)
+                : null;
+    }
+
+    private IntegrationInboxMessage AppendRejectedInbox(
+        EffectiveIdentity actor,
+        ProductionOrderIngressRequest request,
+        string payloadHash,
+        Rejection rejection,
+        Guid? productionOrderId,
+        string correlationId)
+    {
+        var rejectedAt = timeProvider.GetUtcNow();
+        var rejected = new IntegrationInboxMessage
+        {
+            Id = Guid.NewGuid(),
+            SourceSystem = request.SourceSystem,
+            MessageId = request.MessageId,
+            BusinessKey = request.BusinessKey,
+            SourceVersion = request.SourceVersion,
+            ContractVersion = request.ContractVersion,
+            PayloadHash = payloadHash,
+            PayloadHashAlgorithm = "SHA-256",
+            Status = IntegrationInboxStatus.Rejected,
+            ResultCode = rejection.Code,
+            ResultMessage = rejection.Message,
+            HttpStatusCode = rejection.HttpStatusCode,
+            ReceivedAtUtc = rejectedAt,
+            ProcessedAtUtc = rejectedAt,
+            ProductionOrderId = productionOrderId,
+        };
+        context.IntegrationInboxMessages.Add(rejected);
+        auditWriter.Append(new BusinessAuditWrite(
+            BusinessAuditActor.From(actor),
+            BusinessRole.Planner,
+            BusinessCapability.ProductionOrderManage,
+            "ERP_PRODUCTION_ORDER_INGRESS",
+            "ProductionOrder",
+            request.BusinessKey,
+            BusinessAuditResult.Denied,
+            rejection.Code,
+            correlationId));
+        return rejected;
+    }
+
+    private sealed record Rejection(string Code, string Message, int HttpStatusCode);
+}

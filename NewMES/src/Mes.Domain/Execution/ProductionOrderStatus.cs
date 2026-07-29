@@ -2,7 +2,7 @@ namespace Mes.Domain.Execution;
 
 public enum ProductionOrderStatus
 {
-    Created,
+    Received,
     Released,
     Closed,
     Cancelled,

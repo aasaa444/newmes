@@ -39,7 +39,7 @@ public static class MigratorApplication
                 Console.WriteLine("Applying controlled EF Core migrations...");
                 await context.Database.MigrateAsync();
                 Console.WriteLine(
-                    $"Database is current at {MesMigrationIds.CapabilityRolesAuditContext}.");
+                    $"Database is current at {MesMigrationIds.IdempotentProductionOrderIngress}.");
                 return 0;
             }
 

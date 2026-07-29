@@ -23,5 +23,8 @@ public sealed class ProductionOrder
 
     public string? SourceReference { get; init; }
 
+    // Null after an upgrade means the legacy source version cannot be proven.
+    public string? SourceVersion { get; init; }
+
     public byte[] Version { get; private set; } = [];
 }

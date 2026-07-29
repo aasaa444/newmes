@@ -21,6 +21,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.InitialFoundation,
         MesMigrationIds.EvolutionBaseline,
         MesMigrationIds.CapabilityRolesAuditContext,
+        MesMigrationIds.IdempotentProductionOrderIngress,
     ];
 
     [SqlServerFact]
@@ -33,6 +34,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.Empty(await context.Database.GetPendingMigrationsAsync());
         Assert.Equal(CurrentMigrationIds, await context.Database.GetAppliedMigrationsAsync());
         Assert.True(await TableExistsAsync(context, "ManufacturingEvents"));
+        Assert.True(await TableExistsAsync(context, "IntegrationInboxMessages"));
     }
 
     [SqlServerFact]
@@ -60,6 +62,16 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             .Select(order => order.OrderNumber)
             .SingleAsync();
         Assert.Equal("PO-LEGACY-001", orderNumber);
+        Assert.Equal(
+            ProductionOrderStatus.Received,
+            await context.ProductionOrders
+                .Where(order => order.Id == orderId)
+                .Select(order => order.Status)
+                .SingleAsync());
+        Assert.Null(await context.ProductionOrders
+            .Where(order => order.Id == orderId)
+            .Select(order => order.SourceVersion)
+            .SingleAsync());
         Assert.False(await context.ManufacturingEvents.AnyAsync());
     }
 
@@ -79,7 +91,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
                 INSERT INTO [mes].[ProductionOrders]
                     ([Id], [OrderNumber], [MaterialId], [PlannedQuantity], [Status], [CreatedAtUtc], [SourceSystem])
                 VALUES
-                    ({{Guid.NewGuid()}}, N'PO-ZERO', {{materialId}}, 0, N'Created', SYSUTCDATETIME(), N'Manual');
+                    ({{Guid.NewGuid()}}, N'PO-ZERO', {{materialId}}, 0, N'Received', SYSUTCDATETIME(), N'Manual');
                 """));
         Assert.Equal(547, error.Number);
     }

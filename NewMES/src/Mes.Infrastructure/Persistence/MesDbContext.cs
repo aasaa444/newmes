@@ -1,6 +1,7 @@
 using Mes.Domain.Auditing;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
+using Mes.Domain.Integration;
 using Mes.Domain.MasterData;
 using Microsoft.EntityFrameworkCore;
 
@@ -13,6 +14,12 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
     public DbSet<UserRoleAssignment> UserRoleAssignments => Set<UserRoleAssignment>();
 
     public DbSet<BusinessAuditRecord> BusinessAuditRecords => Set<BusinessAuditRecord>();
+
+    public DbSet<IntegrationInboxMessage> IntegrationInboxMessages =>
+        Set<IntegrationInboxMessage>();
+
+    public DbSet<IntegrationInboxConflict> IntegrationInboxConflicts =>
+        Set<IntegrationInboxConflict>();
 
     public DbSet<Material> Materials => Set<Material>();
 
@@ -138,7 +145,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                         "[PlannedQuantity] > 0");
                     table.HasCheckConstraint(
                         "CK_ProductionOrders_Status",
-                        "[Status] IN ('Created', 'Released', 'Closed', 'Cancelled')");
+                        "[Status] IN ('Received', 'Released', 'Closed', 'Cancelled')");
                 });
             entity.HasKey(order => order.Id);
             entity.Property(order => order.OrderNumber).HasMaxLength(80);
@@ -147,11 +154,76 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .HasMaxLength(24);
             entity.Property(order => order.SourceSystem).HasMaxLength(80);
             entity.Property(order => order.SourceReference).HasMaxLength(160);
+            entity.Property(order => order.SourceVersion).HasMaxLength(80);
             entity.Property(order => order.Version).IsRowVersion();
             entity.HasIndex(order => order.OrderNumber).IsUnique();
+            entity.HasIndex(order => new { order.SourceSystem, order.SourceReference })
+                .IsUnique()
+                .HasFilter("[SourceSystem] IS NOT NULL AND [SourceReference] IS NOT NULL");
             entity.HasOne(order => order.Material)
                 .WithMany()
                 .HasForeignKey(order => order.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<IntegrationInboxMessage>(entity =>
+        {
+            entity.ToTable(
+                "IntegrationInboxMessages",
+                "integration",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_IntegrationInboxMessages_Status",
+                        "[Status] IN ('Accepted', 'Rejected')");
+                    table.HasCheckConstraint(
+                        "CK_IntegrationInboxMessages_HttpStatusCode",
+                        "[HttpStatusCode] BETWEEN 100 AND 599");
+                });
+            entity.HasKey(message => message.Id);
+            entity.Property(message => message.SourceSystem).HasMaxLength(80);
+            entity.Property(message => message.MessageId).HasMaxLength(120);
+            entity.Property(message => message.BusinessKey).HasMaxLength(160);
+            entity.Property(message => message.SourceVersion).HasMaxLength(80);
+            entity.Property(message => message.ContractVersion).HasMaxLength(32);
+            entity.Property(message => message.PayloadHash).HasMaxLength(64);
+            entity.Property(message => message.PayloadHashAlgorithm).HasMaxLength(16);
+            entity.Property(message => message.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+            entity.Property(message => message.ResultCode).HasMaxLength(80);
+            entity.Property(message => message.ResultMessage).HasMaxLength(400);
+            entity.HasIndex(message => new { message.SourceSystem, message.MessageId })
+                .IsUnique();
+            entity.HasIndex(message => new
+            {
+                message.SourceSystem,
+                message.BusinessKey,
+                message.SourceVersion,
+            });
+            entity.HasOne(message => message.ProductionOrder)
+                .WithMany()
+                .HasForeignKey(message => message.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<IntegrationInboxConflict>(entity =>
+        {
+            entity.ToTable("IntegrationInboxConflicts", "integration");
+            entity.HasKey(conflict => conflict.Id);
+            entity.Property(conflict => conflict.ExistingPayloadHash).HasMaxLength(64);
+            entity.Property(conflict => conflict.ObservedPayloadHash).HasMaxLength(64);
+            entity.Property(conflict => conflict.ResultCode).HasMaxLength(80);
+            entity.Property(conflict => conflict.ResultMessage).HasMaxLength(400);
+            entity.Property(conflict => conflict.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(conflict => new
+            {
+                conflict.InboxMessageId,
+                conflict.OccurredAtUtc,
+            });
+            entity.HasOne(conflict => conflict.InboxMessage)
+                .WithMany()
+                .HasForeignKey(conflict => conflict.InboxMessageId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

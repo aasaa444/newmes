@@ -179,6 +179,10 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<string>("SourceVersion")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
@@ -197,11 +201,144 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
+                    b.HasIndex("SourceSystem", "SourceReference")
+                        .IsUnique()
+                        .HasFilter("[SourceSystem] IS NOT NULL AND [SourceReference] IS NOT NULL");
+
                     b.ToTable("ProductionOrders", "mes", t =>
                         {
                             t.HasCheckConstraint("CK_ProductionOrders_PlannedQuantity", "[PlannedQuantity] > 0");
 
-                            t.HasCheckConstraint("CK_ProductionOrders_Status", "[Status] IN ('Created', 'Released', 'Closed', 'Cancelled')");
+                            t.HasCheckConstraint("CK_ProductionOrders_Status", "[Status] IN ('Received', 'Released', 'Closed', 'Cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxConflict", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ExistingPayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<Guid>("InboxMessageId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ObservedPayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("ResultCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ResultMessage")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("InboxMessageId", "OccurredAtUtc");
+
+                    b.ToTable("IntegrationInboxConflicts", "integration");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("BusinessKey")
+                        .IsRequired()
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("ContractVersion")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<int>("HttpStatusCode")
+                        .HasColumnType("int");
+
+                    b.Property<string>("MessageId")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<string>("PayloadHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("PayloadHashAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<DateTimeOffset>("ProcessedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ProductionOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ReceivedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("ResultCode")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ResultMessage")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("SourceVersion")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductionOrderId");
+
+                    b.HasIndex("SourceSystem", "BusinessKey", "SourceVersion");
+
+                    b.HasIndex("SourceSystem", "MessageId")
+                        .IsUnique();
+
+                    b.ToTable("IntegrationInboxMessages", "integration", t =>
+                        {
+                            t.HasCheckConstraint("CK_IntegrationInboxMessages_HttpStatusCode", "[HttpStatusCode] BETWEEN 100 AND 599");
+
+                            t.HasCheckConstraint("CK_IntegrationInboxMessages_Status", "[Status] IN ('Accepted', 'Rejected')");
                         });
                 });
 
@@ -260,6 +397,27 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_UserAccountRoles_Role", "[Role] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
                         });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxConflict", b =>
+                {
+                    b.HasOne("Mes.Domain.Integration.IntegrationInboxMessage", "InboxMessage")
+                        .WithMany()
+                        .HasForeignKey("InboxMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InboxMessage");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxMessage", b =>
+                {
+                    b.HasOne("Mes.Domain.Execution.ProductionOrder", "ProductionOrder")
+                        .WithMany()
+                        .HasForeignKey("ProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ProductionOrder");
                 });
 
             modelBuilder.Entity("Mes.Domain.MasterData.Material", b =>

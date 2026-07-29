@@ -72,7 +72,7 @@ public sealed class DemoDataInitializer(MesDbContext context)
                     OrderNumber = "DEMO-PO-0001",
                     MaterialId = DemoMaterialId,
                     PlannedQuantity = 5,
-                    Status = ProductionOrderStatus.Created,
+                    Status = ProductionOrderStatus.Received,
                     CreatedAtUtc = new DateTimeOffset(2026, 7, 29, 0, 0, 0, TimeSpan.Zero),
                     SourceSystem = "DemoInitializer",
                     SourceReference = "explicit-non-production-seed",

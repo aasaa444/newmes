@@ -25,6 +25,14 @@ Ticket 03 建立了可组合角色与业务审计上下文：
 - 登录身份、有效角色和能力可通过 API 查询，账号管理和审计查询由服务端能力控制。
 - 业务审计与制造事件分表保存，并由 SQL Server 拒绝更新和删除。
 
+Ticket 04 建立了 ERP 生产订单幂等入站：
+
+- ERP 与 Development 环境的模拟器调用同一版本化 HTTP 契约和 Inbox 服务。
+- `SourceSystem + MessageId` 完全重投返回首次结果，不重复创建工单或业务审计。
+- 载荷冲突、未知物料、非法字段和不支持版本返回稳定错误码及中文行动说明。
+- 新订单进入 `Received`，同业务键的新消息不会覆盖订单，而是要求后续受控变更。
+- 计划员工作台查询返回订单来源版本和入站处理结果。
+
 ## 工程结构
 
 ```text
@@ -50,4 +58,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
