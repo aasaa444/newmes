@@ -4,7 +4,7 @@
 
 ## 外置文件
 
-在仓库外准备并限制为部署账号可读：
+在仓库外准备并限制为部署账号和专用容器 secret-reader 组可读：
 
 - API 最小权限连接串；
 - Migration 专用连接串；
@@ -17,6 +17,7 @@
 ```powershell
 $env:NEWMES_IMAGE_TAG = '<不可变版本号>'
 $env:NEWMES_SQL_EDITION = 'Express'
+$env:NEWMES_SECRET_GID = '<Linux 主机 secret-reader 组的数字 GID>'
 $env:NEWMES_APP_CONNECTION_FILE = '<仓库外绝对路径>'
 $env:NEWMES_MIGRATION_CONNECTION_FILE = '<仓库外绝对路径>'
 $env:NEWMES_JWT_SIGNING_KEY_FILE = '<仓库外绝对路径>'
@@ -26,6 +27,15 @@ $env:NEWMES_TLS_PRIVATE_KEY_FILE = '<仓库外绝对路径>'
 ```
 
 未设置 `NEWMES_SQL_EDITION` 时默认为可用于生产的 SQL Server Express。Express 受数据库大小、内存和计算资源限制；超出单线试点容量前应购买对应授权并将值改为企业批准的 edition，生产环境禁止使用 Developer。
+
+Linux 主机需要创建无登录权限的专用组，将 secret 文件设置为该组拥有且权限为 `0440`，并把数字 GID 传给 Compose。Compose 的本地 file secret 本质是 bind mount，不能依赖 long syntax 自动改写 `uid/gid/mode`；`group_add` 才能保证非 root 的 API、Migration 和 SQL Server 进程可读各自挂载的文件。该组除部署账号外不得加入宿主登录用户。
+
+```bash
+sudo groupadd --gid 20000 newmes-secrets
+sudo chgrp 20000 /srv/newmes/secrets/*
+sudo chmod 0440 /srv/newmes/secrets/*
+export NEWMES_SECRET_GID=20000
+```
 
 ## 启动顺序
 

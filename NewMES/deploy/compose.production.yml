@@ -12,15 +12,17 @@ services:
     networks:
       - edge
       - backend
+    group_add:
+      - ${NEWMES_SECRET_GID:?Set NEWMES_SECRET_GID}
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     secrets:
       - source: tls_certificate
         target: tls_certificate
-        mode: 0444
+        mode: 0440
       - source: tls_private_key
         target: tls_private_key
-        mode: 0400
+        mode: 0440
     read_only: true
     tmpfs:
       - /var/cache/nginx
@@ -63,13 +65,15 @@ services:
       Security__DemoInitializationEnabled: "false"
     networks:
       - backend
+    group_add:
+      - ${NEWMES_SECRET_GID:?Set NEWMES_SECRET_GID}
     secrets:
       - source: app_connection_string
         target: ConnectionStrings__MesDatabase
-        mode: 0400
+        mode: 0440
       - source: jwt_signing_key
         target: Security__JwtSigningKey
-        mode: 0400
+        mode: 0440
     read_only: true
     tmpfs:
       - /tmp
@@ -94,10 +98,12 @@ services:
       MES_SECRETS_DIRECTORY: /run/secrets
     networks:
       - backend
+    group_add:
+      - ${NEWMES_SECRET_GID:?Set NEWMES_SECRET_GID}
     secrets:
       - source: migration_connection_string
         target: ConnectionStrings__MesDatabase
-        mode: 0400
+        mode: 0440
     read_only: true
     tmpfs:
       - /tmp
@@ -123,10 +129,12 @@ services:
         exec /opt/mssql/bin/sqlservr
     networks:
       - backend
+    group_add:
+      - ${NEWMES_SECRET_GID:?Set NEWMES_SECRET_GID}
     secrets:
       - source: sql_sa_password
         target: sql_sa_password
-        mode: 0400
+        mode: 0440
     volumes:
       - sqlserver-data:/var/opt/mssql
     security_opt:

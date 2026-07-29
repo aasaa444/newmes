@@ -29,7 +29,8 @@ public sealed class ProductionSecurityHealthCheckTests
             .Build();
         var provider = new ProductionSecurityContextProvider(
             configuration,
-            new TestHostEnvironment("Development"));
+            new TestHostEnvironment("Development"),
+            Path.Combine(Path.GetTempPath(), $"missing-newmes-secrets-{Guid.NewGuid():N}"));
         var privilegeProbe = new FailIfCalledPrivilegeProbe();
         var healthCheck = new ProductionSecurityHealthCheck(
             provider,

@@ -12,6 +12,7 @@ public sealed class ProductionSecurityBaselineTests
             DeploymentMode: "Production",
             ExternalHttpsOnly: true,
             SecretsSource: "ExternalFiles",
+            ExternalSecretsVerified: true,
             SigningKey: "mR7fQ2xL9vN4cK8pT6wY3zB5dH1sJ0uG",
             DemoInitializationEnabled: false,
             CorsOrigins: ["https://mes.factory.local"],
@@ -34,6 +35,7 @@ public sealed class ProductionSecurityBaselineTests
             DeploymentMode: "Production",
             ExternalHttpsOnly: false,
             SecretsSource: "Environment",
+            ExternalSecretsVerified: false,
             SigningKey: sampleKey,
             DemoInitializationEnabled: true,
             CorsOrigins: ["*", "http://mes.factory.local"],
@@ -49,6 +51,8 @@ public sealed class ProductionSecurityBaselineTests
             violation.Code == "SEC_EXTERNAL_HTTPS_REQUIRED");
         Assert.Contains(result.Violations, violation =>
             violation.Code == "SEC_EXTERNAL_SECRETS_REQUIRED");
+        Assert.Contains(result.Violations, violation =>
+            violation.Code == "SEC_EXTERNAL_SECRET_FILES_UNVERIFIED");
         Assert.Contains(result.Violations, violation =>
             violation.Code == "SEC_SAMPLE_SIGNING_KEY");
         Assert.Contains(result.Violations, violation =>

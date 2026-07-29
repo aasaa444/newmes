@@ -230,7 +230,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             await context.Database.ExecuteSqlRawAsync("""
                 CREATE USER [mes_runtime_probe] WITHOUT LOGIN;
                 GRANT CONNECT TO [mes_runtime_probe];
-                GRANT SELECT TO [mes_runtime_probe];
+                GRANT SELECT ON OBJECT::[dbo].[__EFMigrationsHistory] TO [mes_runtime_probe];
                 EXECUTE AS USER = N'mes_runtime_probe';
                 """);
             isImpersonating = true;
@@ -249,6 +249,42 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             }
 
             await context.Database.ExecuteSqlRawAsync("DROP USER [mes_runtime_probe];");
+        }
+    }
+
+    [SqlServerFact]
+    public async Task DatabaseUserWithDdlPrivilegesIsRejectedForApiRuntime()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        await context.Database.OpenConnectionAsync();
+        var isImpersonating = false;
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync("""
+                CREATE USER [mes_ddl_probe] WITHOUT LOGIN;
+                ALTER ROLE [db_ddladmin] ADD MEMBER [mes_ddl_probe];
+                EXECUTE AS USER = N'mes_ddl_probe';
+                """);
+            isImpersonating = true;
+            var probe = new SqlServerRuntimePrivilegeProbe(context);
+
+            var result = await probe.CheckAsync();
+
+            Assert.False(result.IsLeastPrivilege);
+            Assert.Contains("SEC_DATABASE_HIGH_PRIVILEGE", result.ViolationCodes);
+        }
+        finally
+        {
+            if (isImpersonating)
+            {
+                await context.Database.ExecuteSqlRawAsync("REVERT;");
+            }
+
+            await context.Database.ExecuteSqlRawAsync("""
+                ALTER ROLE [db_ddladmin] DROP MEMBER [mes_ddl_probe];
+                DROP USER [mes_ddl_probe];
+                """);
         }
     }
 

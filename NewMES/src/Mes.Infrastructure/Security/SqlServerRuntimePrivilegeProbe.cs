@@ -21,11 +21,22 @@ public sealed class SqlServerRuntimePrivilegeProbe(
         CancellationToken cancellationToken = default)
     {
         const string sql = """
-            SELECT
-                COALESCE(IS_SRVROLEMEMBER('sysadmin'), 0),
-                COALESCE(IS_MEMBER('db_owner'), 0),
-                COALESCE(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL'), 0),
-                COALESCE(HAS_PERMS_BY_NAME(NULL, NULL, 'CONTROL SERVER'), 0);
+            SELECT CAST(CASE WHEN
+                COALESCE(IS_SRVROLEMEMBER('sysadmin'), 0) = 1 OR
+                COALESCE(IS_SRVROLEMEMBER('serveradmin'), 0) = 1 OR
+                COALESCE(IS_SRVROLEMEMBER('securityadmin'), 0) = 1 OR
+                COALESCE(IS_SRVROLEMEMBER('dbcreator'), 0) = 1 OR
+                COALESCE(IS_MEMBER('db_owner'), 0) = 1 OR
+                COALESCE(IS_MEMBER('db_accessadmin'), 0) = 1 OR
+                COALESCE(IS_MEMBER('db_securityadmin'), 0) = 1 OR
+                COALESCE(IS_MEMBER('db_ddladmin'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CONTROL'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'ALTER'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME(DB_NAME(), 'DATABASE', 'CREATE TABLE'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME('mes', 'SCHEMA', 'CONTROL'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME('mes', 'SCHEMA', 'ALTER'), 0) = 1 OR
+                COALESCE(HAS_PERMS_BY_NAME(NULL, NULL, 'CONTROL SERVER'), 0) = 1
+                THEN 1 ELSE 0 END AS bit);
             """;
         var connection = context.Database.GetDbConnection();
         var shouldClose = connection.State != ConnectionState.Open;
@@ -45,8 +56,7 @@ public sealed class SqlServerRuntimePrivilegeProbe(
                     "SQL Server did not return runtime privilege information.");
             }
 
-            var isElevated = Enumerable.Range(0, 4)
-                .Any(index => reader.GetInt32(index) == 1);
+            var isElevated = reader.GetBoolean(0);
             return isElevated
                 ? new DatabasePrivilegeResult(false, ["SEC_DATABASE_HIGH_PRIVILEGE"])
                 : new DatabasePrivilegeResult(true, []);

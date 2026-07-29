@@ -14,6 +14,7 @@ $secretFileEnvironment = @{
 }
 $requiredEnvironment = @{
     NEWMES_IMAGE_TAG = 'security-check'
+    NEWMES_SECRET_GID = '20000'
 }
 foreach ($entry in $secretFileEnvironment.GetEnumerator()) {
     $requiredEnvironment[$entry.Key] = $entry.Value
@@ -67,9 +68,13 @@ try {
     Assert-Topology ($services.sqlserver.environment.MSSQL_PID -ne 'Developer') 'The production topology cannot use SQL Server Developer edition.'
     Assert-Topology ($services.api.secrets.target -contains 'ConnectionStrings__MesDatabase') 'The API connection string secret mount is missing.'
     Assert-Topology ($services.api.secrets.target -contains 'Security__JwtSigningKey') 'The signing key secret mount is missing.'
+    Assert-Topology ($services.api.group_add -contains '20000') 'The API must join the dedicated secret-reader group.'
     Assert-Topology ($services.migrator.secrets.target -contains 'ConnectionStrings__MesDatabase') 'The Migration connection secret mount is missing.'
+    Assert-Topology ($services.migrator.group_add -contains '20000') 'The migrator must join the dedicated secret-reader group.'
+    Assert-Topology ($services.sqlserver.group_add -contains '20000') 'SQL Server must join the dedicated secret-reader group.'
     Assert-Topology ($services.proxy.secrets.target -contains 'tls_certificate') 'The TLS certificate secret mount is missing.'
     Assert-Topology ($services.proxy.secrets.target -contains 'tls_private_key') 'The TLS private key secret mount is missing.'
+    Assert-Topology ($services.proxy.group_add -contains '20000') 'The reverse proxy must join the dedicated secret-reader group.'
     Assert-Topology ($services.api.logging.driver -eq 'json-file') 'API logs must use the bounded JSON log driver.'
     Assert-Topology ($services.api.logging.options.'max-size' -eq '10m') 'API log size rotation is missing.'
     Assert-Topology ($services.api.logging.options.'max-file' -eq '5') 'API log retention count is missing.'

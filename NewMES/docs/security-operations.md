@@ -24,7 +24,7 @@
 
 ## 外置秘密
 
-以下文件放在仓库和镜像之外，只允许部署账号读取：API 连接串、Migration 连接串、JWT 签名密钥、SQL 管理员初始密码、TLS 证书和私钥。文件路径通过 `NEWMES_*_FILE` 环境变量交给 Compose，秘密内容不作为环境变量传入容器。
+以下文件放在仓库和镜像之外，只允许部署账号和无登录权限的专用容器 secret-reader 组读取：API 连接串、Migration 连接串、JWT 签名密钥、SQL 管理员初始密码、TLS 证书和私钥。宿主文件必须属于 `NEWMES_SECRET_GID` 指定的数字组并设置为 `0440`；Compose 通过 `group_add` 让非 root 进程读取各自挂载的文件。文件路径通过 `NEWMES_*_FILE` 环境变量交给 Compose，秘密内容不作为环境变量传入容器。
 
 - JWT 签名密钥至少 32 个随机字符，不得包含 `demo`、`sample`、`changeme` 等示例标记。
 - 轮换数据库凭据时，先创建新凭据并验证就绪，再撤销旧凭据；不要原地覆盖后直接删除回退路径。

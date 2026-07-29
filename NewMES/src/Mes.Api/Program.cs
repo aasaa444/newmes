@@ -35,7 +35,10 @@ builder.Services.AddDbContext<MesDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 builder.Services.AddScoped<DatabaseCompatibilityChecker>();
 builder.Services.AddScoped<IRuntimeDatabasePrivilegeProbe, SqlServerRuntimePrivilegeProbe>();
-builder.Services.AddSingleton<ProductionSecurityContextProvider>();
+builder.Services.AddSingleton(_ => new ProductionSecurityContextProvider(
+    builder.Configuration,
+    builder.Environment,
+    secretsDirectory));
 builder.Services.AddScoped<CorrelationContextAccessor>();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
@@ -60,7 +63,9 @@ var configuredCorsOrigins = builder.Configuration
     .Cast<string>()
     .ToArray();
 var effectiveCorsOrigins = configuredCorsOrigins
-    .Where(origin => IsAllowedRuntimeCorsOrigin(origin, builder.Environment.IsProduction()))
+    .Where(origin => ProductionCorsPolicy.IsAllowedOrigin(
+        origin,
+        builder.Environment.IsProduction()))
     .ToArray();
 if (effectiveCorsOrigins.Length > 0)
 {
@@ -121,18 +126,5 @@ app.MapGet("/api/system/info", (CorrelationContextAccessor correlation) =>
     }));
 
 app.Run();
-
-static bool IsAllowedRuntimeCorsOrigin(string origin, bool isProduction)
-{
-    if (string.Equals(origin, "*", StringComparison.Ordinal)
-        || !Uri.TryCreate(origin, UriKind.Absolute, out var uri))
-    {
-        return false;
-    }
-
-    return !isProduction
-        || (string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-            && !uri.IsLoopback);
-}
 
 public partial class Program;

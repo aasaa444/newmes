@@ -5,7 +5,8 @@ namespace Mes.Infrastructure.Security;
 
 public sealed class ProductionSecurityContextProvider(
     IConfiguration configuration,
-    IHostEnvironment environment)
+    IHostEnvironment environment,
+    string secretsDirectory)
 {
     public bool RequiresProductionBaseline =>
         environment.IsProduction()
@@ -36,10 +37,32 @@ public sealed class ProductionSecurityContextProvider(
                 configuration["Security:ExternalHttpsOnly"],
                 out var externalHttpsOnly) && externalHttpsOnly,
             SecretsSource: configuration["Security:SecretsSource"],
+            ExternalSecretsVerified: RequiredSecretFilesAreAvailable(),
             SigningKey: configuration["Security:JwtSigningKey"],
             DemoInitializationEnabled: demoInitialization,
             CorsOrigins: corsOrigins,
             DatabaseConnectionString:
                 configuration.GetConnectionString("MesDatabase") ?? string.Empty);
+    }
+
+    private bool RequiredSecretFilesAreAvailable()
+    {
+        try
+        {
+            return ExternalSecretFile.ReadOptional(
+                    secretsDirectory,
+                    "ConnectionStrings__MesDatabase") is not null
+                && ExternalSecretFile.ReadOptional(
+                    secretsDirectory,
+                    "Security__JwtSigningKey") is not null;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

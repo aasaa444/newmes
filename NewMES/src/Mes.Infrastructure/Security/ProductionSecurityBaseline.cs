@@ -7,6 +7,7 @@ public sealed record ProductionSecurityContext(
     string DeploymentMode,
     bool ExternalHttpsOnly,
     string? SecretsSource,
+    bool ExternalSecretsVerified,
     string? SigningKey,
     bool? DemoInitializationEnabled,
     IReadOnlyList<string> CorsOrigins,
@@ -56,6 +57,11 @@ public static class ProductionSecurityBaseline
             !string.Equals(context.SecretsSource, "ExternalFiles", StringComparison.Ordinal),
             "SEC_EXTERNAL_SECRETS_REQUIRED",
             "Production secrets must be loaded from external files.");
+        AddIf(
+            violations,
+            !context.ExternalSecretsVerified,
+            "SEC_EXTERNAL_SECRET_FILES_UNVERIFIED",
+            "Required production secret files are missing, empty, or unreadable.");
 
         EvaluateSigningKey(context.SigningKey, violations);
 
@@ -76,9 +82,7 @@ public static class ProductionSecurityBaseline
                 continue;
             }
 
-            if (!Uri.TryCreate(origin, UriKind.Absolute, out var uri)
-                || !string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase)
-                || uri.IsLoopback)
+            if (!ProductionCorsPolicy.IsAllowedOrigin(origin, isProduction: true))
             {
                 Add(
                     violations,
