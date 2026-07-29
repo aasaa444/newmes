@@ -83,6 +83,7 @@ $env:NEWMES_SQLSERVER_TEST_CONNECTION = 'Server=.\SQLEXPRESS;Database=master;Int
 - 事务失败回滚；
 - 制造事件拒绝更新和删除，只能追加更正事件；
 - ERP 生产订单 Inbox 的重复、冲突、并发收敛和事务回滚；
+- 订单下达快照、模板/快照只追加约束、数量平衡和并发生效；
 - `rowversion` 拒绝基于过期版本的并发覆盖；
 - Migration 重复执行无副作用；
 - 旧版本拒绝就绪、当前版本进入就绪；

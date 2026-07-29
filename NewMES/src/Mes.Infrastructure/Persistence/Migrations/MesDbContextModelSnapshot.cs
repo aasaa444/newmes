@@ -33,6 +33,11 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<string>("ActorRolesSnapshot")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
                     b.Property<Guid?>("ActorUserId")
                         .HasColumnType("uniqueidentifier");
 
@@ -40,11 +45,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("ActorRolesSnapshot")
-                        .IsRequired()
-                        .HasMaxLength(400)
-                        .HasColumnType("nvarchar(400)");
 
                     b.Property<string>("AuthorizedRole")
                         .HasMaxLength(40)
@@ -151,17 +151,88 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
+            modelBuilder.Entity("Mes.Domain.Execution.ProductExecutionTemplateVersion", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Applicability")
+                        .IsRequired()
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<string>("DefinitionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DefinitionHashAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsApproved")
+                        .HasColumnType("bit");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("PublishedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("PublishedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Version")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PublishedByUserId");
+
+                    b.HasIndex("MaterialId", "PublishedAtUtc");
+
+                    b.HasIndex("MaterialId", "Version")
+                        .IsUnique();
+
+                    b.ToTable("ProductExecutionTemplateVersions", "mes", t =>
+                        {
+                            t.HasTrigger("TR_ProductExecutionTemplateVersions_AppendOnly");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
             modelBuilder.Entity("Mes.Domain.Execution.ProductionOrder", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<DateTimeOffset?>("ClosedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<bool>("ErpReconciled")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTimeOffset?>("ExecutionCompletedAtUtc")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<Guid>("MaterialId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("OpenQualityHoldQuantity")
+                        .HasColumnType("int");
 
                     b.Property<string>("OrderNumber")
                         .IsRequired()
@@ -169,6 +240,15 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasColumnType("nvarchar(80)");
 
                     b.Property<int>("PlannedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<int>("QualifiedQuantity")
+                        .HasColumnType("int");
+
+                    b.Property<DateTimeOffset?>("ReleasedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("ScrappedQuantity")
                         .HasColumnType("int");
 
                     b.Property<string>("SourceReference")
@@ -183,6 +263,9 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .HasMaxLength(80)
                         .HasColumnType("nvarchar(80)");
 
+                    b.Property<int>("StartedQuantity")
+                        .HasColumnType("int");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasMaxLength(24)
@@ -193,6 +276,9 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("rowversion");
+
+                    b.Property<bool>("WarehouseHandoffCompleted")
+                        .HasColumnType("bit");
 
                     b.HasKey("Id");
 
@@ -209,7 +295,120 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_ProductionOrders_PlannedQuantity", "[PlannedQuantity] > 0");
 
-                            t.HasCheckConstraint("CK_ProductionOrders_Status", "[Status] IN ('Received', 'Released', 'Closed', 'Cancelled')");
+                            t.HasCheckConstraint("CK_ProductionOrders_QuantityBalance", "[StartedQuantity] >= 0 AND [QualifiedQuantity] >= 0 AND [ScrappedQuantity] >= 0 AND [OpenQualityHoldQuantity] >= 0 AND [StartedQuantity] <= [PlannedQuantity] AND [QualifiedQuantity] + [ScrappedQuantity] <= [StartedQuantity] AND [OpenQualityHoldQuantity] <= [StartedQuantity]");
+
+                            t.HasCheckConstraint("CK_ProductionOrders_Status", "[Status] IN ('Received', 'Released', 'InProduction', 'Paused', 'ExecutionCompleted', 'Closed', 'Cancelled')");
+                        });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Execution.ProductionOrderExecutionSnapshot", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid>("CreatedByUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DefinitionHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("DefinitionHashAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("DefinitionJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ProductionOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SnapshotVersion")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<Guid>("SourceTemplateId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("ProductionOrderId")
+                        .IsUnique();
+
+                    b.HasIndex("SourceTemplateId");
+
+                    b.ToTable("ProductionOrderExecutionSnapshots", "mes", t =>
+                        {
+                            t.HasTrigger("TR_ProductionOrderExecutionSnapshots_AppendOnly");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
+                });
+
+            modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PasswordHash")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<string>("PrimaryRole")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("UserAccounts", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserAccounts_PasswordHash", "[PasswordHash] IS NULL OR LEN([PasswordHash]) > 0");
+
+                            t.HasCheckConstraint("CK_UserAccounts_PrimaryRole", "[PrimaryRole] IS NULL OR [PrimaryRole] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
+                        });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
+                {
+                    b.Property<Guid>("UserAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Role")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.HasKey("UserAccountId", "Role");
+
+                    b.ToTable("UserAccountRoles", "security", t =>
+                        {
+                            t.HasCheckConstraint("CK_UserAccountRoles_Role", "[Role] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
                         });
                 });
 
@@ -232,13 +431,13 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("InboxMessageId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<DateTimeOffset>("OccurredAtUtc")
-                        .HasColumnType("datetimeoffset");
-
                     b.Property<string>("ObservedPayloadHash")
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
 
                     b.Property<string>("ResultCode")
                         .IsRequired()
@@ -334,10 +533,10 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("ProductionOrderId");
 
-                    b.HasIndex("SourceSystem", "BusinessKey", "SourceVersion");
-
                     b.HasIndex("SourceSystem", "MessageId")
                         .IsUnique();
+
+                    b.HasIndex("SourceSystem", "BusinessKey", "SourceVersion");
 
                     b.ToTable("IntegrationInboxMessages", "integration", t =>
                         {
@@ -345,84 +544,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("CK_IntegrationInboxMessages_Status", "[Status] IN ('Accepted', 'Rejected')");
                         });
-                });
-
-            modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("DisplayName")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("PasswordHash")
-                        .HasMaxLength(512)
-                        .HasColumnType("nvarchar(512)");
-
-                    b.Property<string>("PrimaryRole")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.Property<string>("Username")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Username")
-                        .IsUnique();
-
-                    b.ToTable("UserAccounts", "security", t =>
-                        {
-                            t.HasCheckConstraint("CK_UserAccounts_PasswordHash", "[PasswordHash] IS NULL OR LEN([PasswordHash]) > 0");
-
-                            t.HasCheckConstraint("CK_UserAccounts_PrimaryRole", "[PrimaryRole] IS NULL OR [PrimaryRole] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
-                        });
-                });
-
-            modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
-                {
-                    b.Property<Guid>("UserAccountId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("Role")
-                        .HasMaxLength(40)
-                        .HasColumnType("nvarchar(40)");
-
-                    b.HasKey("UserAccountId", "Role");
-
-                    b.ToTable("UserAccountRoles", "security", t =>
-                        {
-                            t.HasCheckConstraint("CK_UserAccountRoles_Role", "[Role] IN ('Planner', 'ProcessEngineer', 'Operator', 'LineSupervisor', 'QualityEngineer', 'MaterialHandler', 'SystemAdministrator', 'OperationsManager')");
-                        });
-                });
-
-            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxConflict", b =>
-                {
-                    b.HasOne("Mes.Domain.Integration.IntegrationInboxMessage", "InboxMessage")
-                        .WithMany()
-                        .HasForeignKey("InboxMessageId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("InboxMessage");
-                });
-
-            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxMessage", b =>
-                {
-                    b.HasOne("Mes.Domain.Execution.ProductionOrder", "ProductionOrder")
-                        .WithMany()
-                        .HasForeignKey("ProductionOrderId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ProductionOrder");
                 });
 
             modelBuilder.Entity("Mes.Domain.MasterData.Material", b =>
@@ -480,6 +601,25 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Navigation("CorrectsEvent");
                 });
 
+            modelBuilder.Entity("Mes.Domain.Execution.ProductExecutionTemplateVersion", b =>
+                {
+                    b.HasOne("Mes.Domain.MasterData.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mes.Domain.Identity.UserAccount", "PublishedByUser")
+                        .WithMany()
+                        .HasForeignKey("PublishedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Material");
+
+                    b.Navigation("PublishedByUser");
+                });
+
             modelBuilder.Entity("Mes.Domain.Execution.ProductionOrder", b =>
                 {
                     b.HasOne("Mes.Domain.MasterData.Material", "Material")
@@ -491,6 +631,33 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Navigation("Material");
                 });
 
+            modelBuilder.Entity("Mes.Domain.Execution.ProductionOrderExecutionSnapshot", b =>
+                {
+                    b.HasOne("Mes.Domain.Identity.UserAccount", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mes.Domain.Execution.ProductionOrder", "ProductionOrder")
+                        .WithOne()
+                        .HasForeignKey("Mes.Domain.Execution.ProductionOrderExecutionSnapshot", "ProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mes.Domain.Execution.ProductExecutionTemplateVersion", "SourceTemplate")
+                        .WithMany()
+                        .HasForeignKey("SourceTemplateId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("ProductionOrder");
+
+                    b.Navigation("SourceTemplate");
+                });
+
             modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
                 {
                     b.HasOne("Mes.Domain.Identity.UserAccount", "UserAccount")
@@ -500,6 +667,27 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .IsRequired();
 
                     b.Navigation("UserAccount");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxConflict", b =>
+                {
+                    b.HasOne("Mes.Domain.Integration.IntegrationInboxMessage", "InboxMessage")
+                        .WithMany()
+                        .HasForeignKey("InboxMessageId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("InboxMessage");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Integration.IntegrationInboxMessage", b =>
+                {
+                    b.HasOne("Mes.Domain.Execution.ProductionOrder", "ProductionOrder")
+                        .WithMany()
+                        .HasForeignKey("ProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ProductionOrder");
                 });
 
             modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>

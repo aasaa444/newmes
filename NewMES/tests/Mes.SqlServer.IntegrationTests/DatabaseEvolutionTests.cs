@@ -25,6 +25,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.IdempotentProductionOrderIngress,
         MesMigrationIds.PreserveErpIngressEvidence,
         MesMigrationIds.PreserveRejectedIngressGaps,
+        MesMigrationIds.OrderReleaseSnapshotLifecycle,
     ];
 
     [SqlServerFact]

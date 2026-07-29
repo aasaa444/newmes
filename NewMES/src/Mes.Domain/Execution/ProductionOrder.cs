@@ -14,7 +14,25 @@ public sealed class ProductionOrder
 
     public int PlannedQuantity { get; init; }
 
-    public ProductionOrderStatus Status { get; init; }
+    public ProductionOrderStatus Status { get; set; }
+
+    public int StartedQuantity { get; set; }
+
+    public int QualifiedQuantity { get; set; }
+
+    public int ScrappedQuantity { get; set; }
+
+    public int OpenQualityHoldQuantity { get; set; }
+
+    public bool WarehouseHandoffCompleted { get; set; }
+
+    public bool ErpReconciled { get; set; }
+
+    public DateTimeOffset? ReleasedAtUtc { get; set; }
+
+    public DateTimeOffset? ExecutionCompletedAtUtc { get; set; }
+
+    public DateTimeOffset? ClosedAtUtc { get; set; }
 
     public DateTimeOffset CreatedAtUtc { get; init; }
 

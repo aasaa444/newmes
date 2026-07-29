@@ -2,12 +2,14 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Mes.Api.Identity;
+using Mes.Api.Execution;
 using Mes.Api.Integration;
 using Mes.Api.Observability;
 using Mes.Api.Readiness;
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Security;
 using Mes.Infrastructure.IdentityAccess;
+using Mes.Infrastructure.Execution;
 using Mes.Infrastructure.Integration;
 using Mes.Domain.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -61,6 +63,8 @@ builder.Services.AddScoped<IdentityAccessService>();
 builder.Services.AddScoped<LocalAccountAuthenticator>();
 builder.Services.AddScoped<ProductionOrderIngressService>();
 builder.Services.AddScoped<ProductionOrderWorkbenchQueryService>();
+builder.Services.AddScoped<ExecutionTemplateService>();
+builder.Services.AddScoped<ProductionOrderLifecycleService>();
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<JwtTokenIssuer>();
@@ -172,6 +176,8 @@ app.MapGet("/api/system/info", (CorrelationContextAccessor correlation) =>
     }));
 app.MapIdentityEndpoints();
 app.MapProductionOrderEndpoints(app.Environment.IsDevelopment());
+app.MapExecutionTemplateEndpoints();
+app.MapProductionOrderLifecycleEndpoints();
 
 app.Run();
 

@@ -34,6 +34,14 @@ Ticket 04 建立了 ERP 生产订单幂等入站：
 - Inbox 保留消息类型、完整原始 JSON 与对应 SHA-256；未知扩展字段差异也会触发幂等冲突。
 - 计划员工作台分别返回订单与完整入站处理结果，未创建订单的业务拒绝也可见。
 
+Ticket 05 建立了生产订单下达、执行快照与受控生命周期：
+
+- 工艺工程师发布结构化版本模板；产品、单层 BOM、路线、追溯、身份、固件、测试和完成门禁均进入完整定义。
+- 计划员下达时在同一事务冻结只追加执行快照、更新订单状态并写业务审计；并发下达不产生重复快照。
+- 模板和快照由 SQL Server 拒绝更新/删除；发布新模板不会改变已下达订单。
+- 生命周期区分 `Received`、`Released`、`InProduction`、`Paused`、`ExecutionCompleted`、`Closed` 和投产前 `Cancelled`。
+- 工作台返回计划、投产、合格、报废、未投产和在制数量，以及快照版本和当前可执行命令。
+
 ## 工程结构
 
 ```text
@@ -59,4 +67,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达、执行快照与生命周期](docs/order-release-lifecycle.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

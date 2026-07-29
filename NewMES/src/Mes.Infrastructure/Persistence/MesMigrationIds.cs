@@ -17,4 +17,7 @@ public static class MesMigrationIds
 
     public const string PreserveRejectedIngressGaps =
         "20260729150000_PreserveRejectedIngressGaps";
+
+    public const string OrderReleaseSnapshotLifecycle =
+        "20260729160000_OrderReleaseSnapshotLifecycle";
 }

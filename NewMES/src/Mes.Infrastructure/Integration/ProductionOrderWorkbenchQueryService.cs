@@ -1,4 +1,5 @@
 using Mes.Domain.Identity;
+using Mes.Infrastructure.Execution;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
@@ -23,12 +24,29 @@ public sealed class ProductionOrderWorkbenchQueryService(
             correlationId,
             cancellationToken);
 
-        var orders = await context.ProductionOrders
+        var orderRows = await context.ProductionOrders
             .AsNoTracking()
             .OrderByDescending(order => order.CreatedAtUtc)
             .Select(order => new
             {
-                Order = order,
+                order.Id,
+                order.OrderNumber,
+                MaterialCode = order.Material!.Code,
+                order.PlannedQuantity,
+                order.StartedQuantity,
+                order.QualifiedQuantity,
+                order.ScrappedQuantity,
+                order.OpenQualityHoldQuantity,
+                order.Status,
+                order.WarehouseHandoffCompleted,
+                order.ErpReconciled,
+                order.SourceSystem,
+                order.SourceReference,
+                order.SourceVersion,
+                SnapshotVersion = context.ProductionOrderExecutionSnapshots
+                    .Where(snapshot => snapshot.ProductionOrderId == order.Id)
+                    .Select(snapshot => snapshot.SnapshotVersion)
+                    .SingleOrDefault(),
                 LatestInbox = context.IntegrationInboxMessages
                     .Where(message => message.ProductionOrderId == order.Id)
                     .OrderByDescending(message => message.ProcessedAtUtc)
@@ -40,18 +58,36 @@ public sealed class ProductionOrderWorkbenchQueryService(
                     })
                     .FirstOrDefault(),
             })
-            .Select(item => new ProductionOrderWorkbenchItem(
-                item.Order.Id,
-                item.Order.OrderNumber,
-                item.Order.Material!.Code,
-                item.Order.PlannedQuantity,
-                item.Order.Status.ToString(),
-                item.Order.SourceSystem,
-                item.Order.SourceReference,
-                item.Order.SourceVersion,
+            .ToArrayAsync(cancellationToken);
+        var orders = orderRows.Select(item => new ProductionOrderWorkbenchItem(
+                item.Id,
+                item.OrderNumber,
+                item.MaterialCode,
+                item.PlannedQuantity,
+                item.StartedQuantity,
+                item.QualifiedQuantity,
+                item.ScrappedQuantity,
+                item.PlannedQuantity - item.StartedQuantity,
+                item.StartedQuantity - item.QualifiedQuantity - item.ScrappedQuantity,
+                item.Status.ToString(),
+                item.SnapshotVersion,
+                ProductionOrderCommandPolicy.AvailableCommands(
+                    item.Status,
+                    !string.IsNullOrWhiteSpace(item.SourceSystem)
+                        && !string.IsNullOrWhiteSpace(item.SourceReference)
+                        && !string.IsNullOrWhiteSpace(item.SourceVersion),
+                    item.StartedQuantity,
+                    item.QualifiedQuantity,
+                    item.ScrappedQuantity,
+                    item.OpenQualityHoldQuantity,
+                    item.WarehouseHandoffCompleted,
+                    item.ErpReconciled),
+                item.SourceSystem,
+                item.SourceReference,
+                item.SourceVersion,
                 item.LatestInbox == null ? null : item.LatestInbox.Status,
                 item.LatestInbox == null ? null : item.LatestInbox.ResultCode))
-            .ToArrayAsync(cancellationToken);
+            .ToArray();
 
         var inboundResults = await context.IntegrationInboxMessages
             .AsNoTracking()

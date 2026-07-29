@@ -25,6 +25,12 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     public DbSet<ProductionOrder> ProductionOrders => Set<ProductionOrder>();
 
+    public DbSet<ProductExecutionTemplateVersion> ProductExecutionTemplateVersions =>
+        Set<ProductExecutionTemplateVersion>();
+
+    public DbSet<ProductionOrderExecutionSnapshot> ProductionOrderExecutionSnapshots =>
+        Set<ProductionOrderExecutionSnapshot>();
+
     public DbSet<ManufacturingEvent> ManufacturingEvents => Set<ManufacturingEvent>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -145,7 +151,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                         "[PlannedQuantity] > 0");
                     table.HasCheckConstraint(
                         "CK_ProductionOrders_Status",
-                        "[Status] IN ('Received', 'Released', 'Closed', 'Cancelled')");
+                        "[Status] IN ('Received', 'Released', 'InProduction', 'Paused', 'ExecutionCompleted', 'Closed', 'Cancelled')");
+                    table.HasCheckConstraint(
+                        "CK_ProductionOrders_QuantityBalance",
+                        "[StartedQuantity] >= 0 AND [QualifiedQuantity] >= 0 AND [ScrappedQuantity] >= 0 AND [OpenQualityHoldQuantity] >= 0 AND [StartedQuantity] <= [PlannedQuantity] AND [QualifiedQuantity] + [ScrappedQuantity] <= [StartedQuantity] AND [OpenQualityHoldQuantity] <= [StartedQuantity]");
                 });
             entity.HasKey(order => order.Id);
             entity.Property(order => order.OrderNumber).HasMaxLength(80);
@@ -163,6 +172,56 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne(order => order.Material)
                 .WithMany()
                 .HasForeignKey(order => order.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductExecutionTemplateVersion>(entity =>
+        {
+            entity.ToTable(
+                "ProductExecutionTemplateVersions",
+                "mes",
+                table => table.HasTrigger("TR_ProductExecutionTemplateVersions_AppendOnly"));
+            entity.HasKey(template => template.Id);
+            entity.Property(template => template.Version).HasMaxLength(80);
+            entity.Property(template => template.Applicability).HasMaxLength(400);
+            entity.Property(template => template.DefinitionJson).HasColumnType("nvarchar(max)");
+            entity.Property(template => template.DefinitionHash).HasMaxLength(64);
+            entity.Property(template => template.DefinitionHashAlgorithm).HasMaxLength(24);
+            entity.HasIndex(template => new { template.MaterialId, template.Version }).IsUnique();
+            entity.HasIndex(template => new { template.MaterialId, template.PublishedAtUtc });
+            entity.HasOne(template => template.Material)
+                .WithMany()
+                .HasForeignKey(template => template.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(template => template.PublishedByUser)
+                .WithMany()
+                .HasForeignKey(template => template.PublishedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductionOrderExecutionSnapshot>(entity =>
+        {
+            entity.ToTable(
+                "ProductionOrderExecutionSnapshots",
+                "mes",
+                table => table.HasTrigger("TR_ProductionOrderExecutionSnapshots_AppendOnly"));
+            entity.HasKey(snapshot => snapshot.Id);
+            entity.Property(snapshot => snapshot.SnapshotVersion).HasMaxLength(80);
+            entity.Property(snapshot => snapshot.DefinitionJson).HasColumnType("nvarchar(max)");
+            entity.Property(snapshot => snapshot.DefinitionHash).HasMaxLength(64);
+            entity.Property(snapshot => snapshot.DefinitionHashAlgorithm).HasMaxLength(24);
+            entity.HasIndex(snapshot => snapshot.ProductionOrderId).IsUnique();
+            entity.HasOne(snapshot => snapshot.ProductionOrder)
+                .WithOne()
+                .HasForeignKey<ProductionOrderExecutionSnapshot>(snapshot => snapshot.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(snapshot => snapshot.SourceTemplate)
+                .WithMany()
+                .HasForeignKey(snapshot => snapshot.SourceTemplateId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(snapshot => snapshot.CreatedByUser)
+                .WithMany()
+                .HasForeignKey(snapshot => snapshot.CreatedByUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
