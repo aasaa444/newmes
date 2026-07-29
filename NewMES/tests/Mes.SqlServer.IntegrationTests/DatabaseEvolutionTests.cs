@@ -1,5 +1,6 @@
 using Mes.Infrastructure.Persistence;
 using Mes.Infrastructure.Seeding;
+using Mes.Domain.Execution;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
@@ -77,11 +78,17 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
     {
         await using var context = CreateContext(await server.CreateDatabaseAsync());
         await context.Database.MigrateAsync();
-        await using var transaction = await context.Database.BeginTransactionAsync();
-        await InsertMaterialAsync(context, Guid.NewGuid(), "MAT-ROLLBACK");
 
-        await transaction.RollbackAsync();
+        var error = await Assert.ThrowsAsync<SqlException>(async () =>
+        {
+            await using var transaction = await context.Database.BeginTransactionAsync();
+            await InsertMaterialAsync(context, Guid.NewGuid(), "MAT-ROLLBACK");
+            await InsertMaterialAsync(context, Guid.NewGuid(), "MAT-ROLLBACK");
+            await transaction.CommitAsync();
+        });
 
+        Assert.Equal(2601, error.Number);
+        context.ChangeTracker.Clear();
         Assert.False(await context.Materials.AnyAsync(material => material.Code == "MAT-ROLLBACK"));
     }
 
@@ -133,6 +140,68 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             .Select(order => order.SourceSystem)
             .SingleAsync());
         Assert.False(await context.ManufacturingEvents.AnyAsync());
+    }
+
+    [SqlServerFact]
+    public async Task ManufacturingEventsRejectUpdateAndDelete()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        await context.Database.MigrateAsync();
+        var eventId = Guid.NewGuid();
+        context.ManufacturingEvents.Add(new ManufacturingEvent
+        {
+            Id = eventId,
+            EventType = "BASELINE_TEST",
+            AggregateType = "ProductionOrder",
+            AggregateId = "PO-APPEND-ONLY",
+            OccurredAtUtc = DateTimeOffset.UtcNow,
+            Actor = "sql-server-gate",
+            PayloadJson = "{}",
+        });
+        await context.SaveChangesAsync();
+
+        var updateError = await Assert.ThrowsAsync<SqlException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE [mes].[ManufacturingEvents]
+                SET [Actor] = N'tampered'
+                WHERE [Id] = {{eventId}};
+                """));
+        var deleteError = await Assert.ThrowsAsync<SqlException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($$"""
+                DELETE FROM [mes].[ManufacturingEvents] WHERE [Id] = {{eventId}};
+                """));
+
+        Assert.Equal(51001, updateError.Number);
+        Assert.Equal(51001, deleteError.Number);
+        Assert.Equal("sql-server-gate", await context.ManufacturingEvents
+            .Where(manufacturingEvent => manufacturingEvent.Id == eventId)
+            .Select(manufacturingEvent => manufacturingEvent.Actor)
+            .SingleAsync());
+    }
+
+    [SqlServerFact]
+    public async Task RowVersionRejectsStaleConcurrentUpdate()
+    {
+        var connectionString = await server.CreateDatabaseAsync();
+        await using (var setup = CreateContext(connectionString))
+        {
+            await setup.Database.MigrateAsync();
+            var initializer = new DemoDataInitializer(setup);
+            await initializer.LoadAsync();
+        }
+
+        await using var firstContext = CreateContext(connectionString);
+        await using var secondContext = CreateContext(connectionString);
+        var firstOrder = await firstContext.ProductionOrders.SingleAsync();
+        var staleOrder = await secondContext.ProductionOrders.SingleAsync();
+        firstContext.Entry(firstOrder).Property(order => order.SourceReference).CurrentValue = "first-update";
+        secondContext.Entry(staleOrder).Property(order => order.SourceReference).CurrentValue =
+            "stale-update";
+
+        await firstContext.SaveChangesAsync();
+
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(
+            () => secondContext.SaveChangesAsync());
     }
 
     private static MesDbContext CreateContext(string connectionString)

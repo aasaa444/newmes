@@ -63,7 +63,12 @@ dotnet run --project src\Mes.DbMigrator\Mes.DbMigrator.csproj -- seed-demo --con
 
 ## SQL Server 发布门禁
 
-`scripts/run-sqlserver-gate.ps1` 要求本机 Docker 引擎可用，并由 Testcontainers 启动真实 SQL Server 2022。脚本会显式设置 `NEWMES_RUN_SQLSERVER_TESTS=true`；普通 `dotnet test` 中这些用例显示为跳过，不能作为 SQL Server 发布证据。
+`scripts/run-sqlserver-gate.ps1` 优先使用 `NEWMES_SQLSERVER_TEST_CONNECTION` 指向的隔离 SQL Server；未提供时由 Testcontainers 在可用的 Docker 引擎中启动 SQL Server 2022。外部实例必须允许创建和删除 `NewMesTests_<GUID>` 临时数据库，夹具只清理本次创建且带该前缀的数据库。脚本会显式设置 `NEWMES_RUN_SQLSERVER_TESTS=true`；普通 `dotnet test` 中这些用例显示为跳过，不能作为 SQL Server 发布证据。
+
+```powershell
+$env:NEWMES_SQLSERVER_TEST_CONNECTION = 'Server=.\SQLEXPRESS;Database=master;Integrated Security=True;TrustServerCertificate=True;Encrypt=False'
+.\scripts\run-sqlserver-gate.ps1
+```
 
 门禁覆盖：
 
@@ -71,6 +76,8 @@ dotnet run --project src\Mes.DbMigrator\Mes.DbMigrator.csproj -- seed-demo --con
 - 上一版本带代表性物料和工单升级，旧数据保留且制造事件仍为空；
 - 唯一键、外键、状态与正数量约束；
 - 事务失败回滚；
+- 制造事件拒绝更新和删除，只能追加更正事件；
+- `rowversion` 拒绝基于过期版本的并发覆盖；
 - Migration 重复执行无副作用；
 - 旧版本拒绝就绪、当前版本进入就绪；
 - 显式演示初始化幂等且不补造制造事件。

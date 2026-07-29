@@ -1,12 +1,14 @@
 [CmdletBinding()]
 param()
 
-$ErrorActionPreference = 'SilentlyContinue'
-docker info *> $null
-$dockerExitCode = $LASTEXITCODE
-$ErrorActionPreference = 'Stop'
-if ($dockerExitCode -ne 0) {
-    throw 'Docker engine is required for the real SQL Server release gate.'
+if ([string]::IsNullOrWhiteSpace($env:NEWMES_SQLSERVER_TEST_CONNECTION)) {
+    $ErrorActionPreference = 'SilentlyContinue'
+    docker info *> $null
+    $dockerExitCode = $LASTEXITCODE
+    $ErrorActionPreference = 'Stop'
+    if ($dockerExitCode -ne 0) {
+        throw 'Set NEWMES_SQLSERVER_TEST_CONNECTION or start Docker for the real SQL Server release gate.'
+    }
 }
 
 $previousGateValue = $env:NEWMES_RUN_SQLSERVER_TESTS

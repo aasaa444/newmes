@@ -14,7 +14,7 @@ public sealed class ProductionOrder
 
     public int PlannedQuantity { get; init; }
 
-    public required string Status { get; init; }
+    public ProductionOrderStatus Status { get; init; }
 
     public DateTimeOffset CreatedAtUtc { get; init; }
 

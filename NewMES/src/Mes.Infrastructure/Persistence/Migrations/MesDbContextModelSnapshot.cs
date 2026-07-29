@@ -64,7 +64,12 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("AggregateType", "AggregateId", "OccurredAtUtc");
 
-                    b.ToTable("ManufacturingEvents", "mes");
+                    b.ToTable("ManufacturingEvents", "mes", t =>
+                        {
+                            t.HasTrigger("TR_ManufacturingEvents_AppendOnly");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Mes.Domain.Execution.ProductionOrder", b =>

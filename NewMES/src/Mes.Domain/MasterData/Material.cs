@@ -8,7 +8,7 @@ public sealed class Material
 
     public required string Name { get; init; }
 
-    public required string TraceabilityMode { get; init; }
+    public TraceabilityMode TraceabilityMode { get; init; }
 
     public bool IsActive { get; set; }
 }

@@ -17,7 +17,14 @@ public sealed partial class DatabaseCompatibilityStartupReporter(
             return;
         }
 
-        LogDatabaseBlocked(logger, result.Code, result.Message);
+        if (result.Error is not null)
+        {
+            LogDatabaseCheckFailed(logger, result.Code, result.Message, result.Error);
+        }
+        else
+        {
+            LogDatabaseBlocked(logger, result.Code, result.Message);
+        }
     }
 
     public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -36,4 +43,14 @@ public sealed partial class DatabaseCompatibilityStartupReporter(
         ILogger logger,
         string code,
         string message);
+
+    [LoggerMessage(
+        EventId = 1003,
+        Level = LogLevel.Critical,
+        Message = "Database compatibility check failed. Code={Code}; Message={Message}")]
+    private static partial void LogDatabaseCheckFailed(
+        ILogger logger,
+        string code,
+        string message,
+        Exception exception);
 }

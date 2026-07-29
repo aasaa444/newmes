@@ -24,55 +24,63 @@ public sealed class DemoDataInitializer(MesDbContext context)
                 "Demo data cannot be loaded before all database migrations are applied.");
         }
 
-        await using var transaction = await context.Database.BeginTransactionAsync(cancellationToken);
-
-        if (!await context.UserAccounts.AnyAsync(
-                account => account.Username == "demo.operator",
-                cancellationToken))
+        var strategy = context.Database.CreateExecutionStrategy();
+        await strategy.ExecuteAsync(async () =>
         {
-            context.UserAccounts.Add(new UserAccount
+            // This initializer owns its context in the migrator process. Clearing before a
+            // retry prevents entities tracked by a failed attempt from being added twice.
+            context.ChangeTracker.Clear();
+            await using var transaction =
+                await context.Database.BeginTransactionAsync(cancellationToken);
+
+            if (!await context.UserAccounts.AnyAsync(
+                    account => account.Username == "demo.operator",
+                    cancellationToken))
             {
-                Id = DemoUserId,
-                Username = "demo.operator",
-                DisplayName = "演示操作员",
-                IsActive = true,
-            });
-        }
+                context.UserAccounts.Add(new UserAccount
+                {
+                    Id = DemoUserId,
+                    Username = "demo.operator",
+                    DisplayName = "演示操作员",
+                    IsActive = true,
+                });
+            }
 
-        if (!await context.Materials.AnyAsync(
-                material => material.Code == "DEMO-ROUTER-01",
-                cancellationToken))
-        {
-            context.Materials.Add(new Material
+            if (!await context.Materials.AnyAsync(
+                    material => material.Code == "DEMO-ROUTER-01",
+                    cancellationToken))
             {
-                Id = DemoMaterialId,
-                Code = "DEMO-ROUTER-01",
-                Name = "非生产工业路由器演示产品",
-                TraceabilityMode = "Serial",
-                IsActive = true,
-            });
-        }
+                context.Materials.Add(new Material
+                {
+                    Id = DemoMaterialId,
+                    Code = "DEMO-ROUTER-01",
+                    Name = "非生产工业路由器演示产品",
+                    TraceabilityMode = TraceabilityMode.Serial,
+                    IsActive = true,
+                });
+            }
 
-        await context.SaveChangesAsync(cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
 
-        if (!await context.ProductionOrders.AnyAsync(
-                order => order.OrderNumber == "DEMO-PO-0001",
-                cancellationToken))
-        {
-            context.ProductionOrders.Add(new ProductionOrder
+            if (!await context.ProductionOrders.AnyAsync(
+                    order => order.OrderNumber == "DEMO-PO-0001",
+                    cancellationToken))
             {
-                Id = DemoOrderId,
-                OrderNumber = "DEMO-PO-0001",
-                MaterialId = DemoMaterialId,
-                PlannedQuantity = 5,
-                Status = "Created",
-                CreatedAtUtc = new DateTimeOffset(2026, 7, 29, 0, 0, 0, TimeSpan.Zero),
-                SourceSystem = "DemoInitializer",
-                SourceReference = "explicit-non-production-seed",
-            });
-        }
+                context.ProductionOrders.Add(new ProductionOrder
+                {
+                    Id = DemoOrderId,
+                    OrderNumber = "DEMO-PO-0001",
+                    MaterialId = DemoMaterialId,
+                    PlannedQuantity = 5,
+                    Status = ProductionOrderStatus.Created,
+                    CreatedAtUtc = new DateTimeOffset(2026, 7, 29, 0, 0, 0, TimeSpan.Zero),
+                    SourceSystem = "DemoInitializer",
+                    SourceReference = "explicit-non-production-seed",
+                });
+            }
 
-        await context.SaveChangesAsync(cancellationToken);
-        await transaction.CommitAsync(cancellationToken);
+            await context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        });
     }
 }

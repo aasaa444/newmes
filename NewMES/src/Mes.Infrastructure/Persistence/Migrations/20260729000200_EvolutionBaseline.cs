@@ -66,6 +66,17 @@ public sealed class EvolutionBaseline : Migration
             schema: "mes",
             table: "ManufacturingEvents",
             column: "CorrectsEventId");
+
+        migrationBuilder.Sql("""
+            CREATE TRIGGER [mes].[TR_ManufacturingEvents_AppendOnly]
+            ON [mes].[ManufacturingEvents]
+            INSTEAD OF UPDATE, DELETE
+            AS
+            BEGIN
+                SET NOCOUNT ON;
+                THROW 51001, 'Manufacturing events are append-only; append a correcting event instead.', 1;
+            END;
+            """);
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

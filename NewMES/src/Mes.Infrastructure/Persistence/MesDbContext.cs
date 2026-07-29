@@ -37,7 +37,9 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasKey(material => material.Id);
             entity.Property(material => material.Code).HasMaxLength(80);
             entity.Property(material => material.Name).HasMaxLength(200);
-            entity.Property(material => material.TraceabilityMode).HasMaxLength(16);
+            entity.Property(material => material.TraceabilityMode)
+                .HasConversion<string>()
+                .HasMaxLength(16);
             entity.HasIndex(material => material.Code).IsUnique();
         });
 
@@ -57,7 +59,9 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 });
             entity.HasKey(order => order.Id);
             entity.Property(order => order.OrderNumber).HasMaxLength(80);
-            entity.Property(order => order.Status).HasMaxLength(24);
+            entity.Property(order => order.Status)
+                .HasConversion<string>()
+                .HasMaxLength(24);
             entity.Property(order => order.SourceSystem).HasMaxLength(80);
             entity.Property(order => order.SourceReference).HasMaxLength(160);
             entity.Property(order => order.Version).IsRowVersion();
@@ -70,7 +74,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
         modelBuilder.Entity<ManufacturingEvent>(entity =>
         {
-            entity.ToTable("ManufacturingEvents", "mes");
+            entity.ToTable(
+                "ManufacturingEvents",
+                "mes",
+                table => table.HasTrigger("TR_ManufacturingEvents_AppendOnly"));
             entity.HasKey(manufacturingEvent => manufacturingEvent.Id);
             entity.Property(manufacturingEvent => manufacturingEvent.EventType).HasMaxLength(80);
             entity.Property(manufacturingEvent => manufacturingEvent.AggregateType).HasMaxLength(80);

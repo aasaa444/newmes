@@ -8,7 +8,8 @@ public sealed record DatabaseCompatibility(
     string Message,
     IReadOnlyList<string> AppliedMigrations,
     IReadOnlyList<string> PendingMigrations,
-    IReadOnlyList<string> UnknownMigrations);
+    IReadOnlyList<string> UnknownMigrations,
+    Exception? Error = null);
 
 public sealed class DatabaseCompatibilityChecker(MesDbContext context)
 {
@@ -64,9 +65,14 @@ public sealed class DatabaseCompatibilityChecker(MesDbContext context)
         }
         catch (Exception exception)
         {
-            return NotReady(
+            return new DatabaseCompatibility(
+                false,
                 "DB_COMPATIBILITY_CHECK_FAILED",
-                $"Database compatibility check failed: {exception.GetType().Name}.");
+                "Database compatibility check failed. See the protected application log for details.",
+                [],
+                [],
+                [],
+                exception);
         }
     }
 
