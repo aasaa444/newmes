@@ -552,6 +552,10 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BaseUnit")
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(80)
@@ -579,6 +583,145 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         {
                             t.HasCheckConstraint("CK_Materials_TraceabilityMode", "[TraceabilityMode] IN ('None', 'Lot', 'Serial')");
                         });
+                });
+
+            modelBuilder.Entity("Mes.Domain.Materials.MaterialTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ActorUserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("CommandHash")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("CommandHashAlgorithm")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.Property<string>("CorrelationId")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("FromParty")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("IdempotencyKey")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<decimal>("LineSideBalanceAfter")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("LineSideQuantityDelta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("LotNumber")
+                        .IsRequired()
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
+                    b.Property<Guid>("MaterialId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("OccurredAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<decimal?>("OrderAvailableBalanceAfter")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("OrderAvailableQuantityDelta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<decimal>("OrderIssuedQuantityDelta")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<Guid?>("ProductionOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Quantity")
+                        .HasPrecision(18, 6)
+                        .HasColumnType("decimal(18,6)");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(400)
+                        .HasColumnType("nvarchar(400)");
+
+                    b.Property<DateTimeOffset>("RecordedAtUtc")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<Guid?>("ReversesTransactionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("SourceDocumentNumber")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("SourceDocumentType")
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("SourceSystem")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("nvarchar(80)");
+
+                    b.Property<string>("ToParty")
+                        .HasMaxLength(160)
+                        .HasColumnType("nvarchar(160)");
+
+                    b.Property<string>("TransactionType")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<string>("Unit")
+                        .IsRequired()
+                        .HasMaxLength(24)
+                        .HasColumnType("nvarchar(24)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorUserId");
+
+                    b.HasIndex("ReversesTransactionId")
+                        .IsUnique()
+                        .HasFilter("[ReversesTransactionId] IS NOT NULL");
+
+                    b.HasIndex("SourceSystem", "IdempotencyKey")
+                        .IsUnique();
+
+                    b.HasIndex("MaterialId", "LotNumber", "RecordedAtUtc");
+
+                    b.HasIndex("ProductionOrderId", "MaterialId", "LotNumber", "RecordedAtUtc");
+
+                    b.ToTable("MaterialTransactions", "mes", t =>
+                        {
+                            t.HasTrigger("TR_MaterialTransactions_AppendOnly");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_DeltaShape", "([TransactionType] = 'LineSideTransfer' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0) OR ([TransactionType] = 'OrderIssue' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = -[Quantity] AND [OrderAvailableQuantityDelta] = [Quantity] AND [OrderIssuedQuantityDelta] = [Quantity]) OR ([TransactionType] = 'OrderReturn' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = -[Quantity]) OR ([TransactionType] = 'Consumption' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = 0 AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = 0) OR ([TransactionType] = 'Reversal' AND [ReversesTransactionId] IS NOT NULL) OR ([TransactionType] = 'Adjustment' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND ABS([LineSideQuantityDelta]) = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0)");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_Quantity", "[Quantity] > 0");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_Reason", "[TransactionType] NOT IN ('OrderReturn', 'Reversal', 'Adjustment') OR LEN([Reason]) > 0");
+
+                            t.HasCheckConstraint("CK_MaterialTransactions_Type", "[TransactionType] IN ('LineSideTransfer', 'OrderIssue', 'OrderReturn', 'Consumption', 'Reversal', 'Adjustment')");
+                        });
+
+                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
                 });
 
             modelBuilder.Entity("Mes.Domain.Auditing.BusinessAuditRecord", b =>
@@ -688,6 +831,39 @@ namespace Mes.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("ProductionOrder");
+                });
+
+            modelBuilder.Entity("Mes.Domain.Materials.MaterialTransaction", b =>
+                {
+                    b.HasOne("Mes.Domain.Identity.UserAccount", "ActorUser")
+                        .WithMany()
+                        .HasForeignKey("ActorUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mes.Domain.MasterData.Material", "Material")
+                        .WithMany()
+                        .HasForeignKey("MaterialId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Mes.Domain.Execution.ProductionOrder", "ProductionOrder")
+                        .WithMany()
+                        .HasForeignKey("ProductionOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Mes.Domain.Materials.MaterialTransaction", "ReversesTransaction")
+                        .WithMany()
+                        .HasForeignKey("ReversesTransactionId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.Navigation("ActorUser");
+
+                    b.Navigation("Material");
+
+                    b.Navigation("ProductionOrder");
+
+                    b.Navigation("ReversesTransaction");
                 });
 
             modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>

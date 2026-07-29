@@ -26,6 +26,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.PreserveErpIngressEvidence,
         MesMigrationIds.PreserveRejectedIngressGaps,
         MesMigrationIds.OrderReleaseSnapshotLifecycle,
+        MesMigrationIds.LineSideMaterialTransactionLedger,
     ];
 
     [SqlServerFact]
@@ -39,6 +40,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.Equal(CurrentMigrationIds, await context.Database.GetAppliedMigrationsAsync());
         Assert.True(await TableExistsAsync(context, "ManufacturingEvents"));
         Assert.True(await TableExistsAsync(context, "IntegrationInboxMessages"));
+        Assert.True(await TableExistsAsync(context, "MaterialTransactions"));
     }
 
     [SqlServerFact]
@@ -75,6 +77,10 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.Null(await context.ProductionOrders
             .Where(order => order.Id == orderId)
             .Select(order => order.SourceVersion)
+            .SingleAsync());
+        Assert.Null(await context.Materials
+            .Where(material => material.Id == materialId)
+            .Select(material => material.BaseUnit)
             .SingleAsync());
         Assert.False(await context.ManufacturingEvents.AnyAsync());
     }

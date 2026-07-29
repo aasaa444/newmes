@@ -20,4 +20,7 @@ public static class MesMigrationIds
 
     public const string OrderReleaseSnapshotLifecycle =
         "20260729160000_OrderReleaseSnapshotLifecycle";
+
+    public const string LineSideMaterialTransactionLedger =
+        "20260729170000_LineSideMaterialTransactionLedger";
 }

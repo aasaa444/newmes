@@ -55,6 +55,7 @@ public sealed class DemoDataInitializer(MesDbContext context)
                     Id = DemoMaterialId,
                     Code = "DEMO-ROUTER-01",
                     Name = "非生产工业路由器演示产品",
+                    BaseUnit = "EA",
                     TraceabilityMode = TraceabilityMode.Serial,
                     IsActive = true,
                 });

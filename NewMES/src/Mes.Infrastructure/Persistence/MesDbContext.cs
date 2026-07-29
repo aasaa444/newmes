@@ -2,6 +2,7 @@ using Mes.Domain.Auditing;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
 using Mes.Domain.Integration;
+using Mes.Domain.Materials;
 using Mes.Domain.MasterData;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +23,8 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
         Set<IntegrationInboxConflict>();
 
     public DbSet<Material> Materials => Set<Material>();
+
+    public DbSet<MaterialTransaction> MaterialTransactions => Set<MaterialTransaction>();
 
     public DbSet<ProductionOrder> ProductionOrders => Set<ProductionOrder>();
 
@@ -133,10 +136,100 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasKey(material => material.Id);
             entity.Property(material => material.Code).HasMaxLength(80);
             entity.Property(material => material.Name).HasMaxLength(200);
+            entity.Property(material => material.BaseUnit)
+                .HasMaxLength(24)
+                .IsRequired(false);
             entity.Property(material => material.TraceabilityMode)
                 .HasConversion<string>()
                 .HasMaxLength(16);
             entity.HasIndex(material => material.Code).IsUnique();
+        });
+
+        modelBuilder.Entity<MaterialTransaction>(entity =>
+        {
+            entity.ToTable(
+                "MaterialTransactions",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_MaterialTransactions_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_MaterialTransactions_Type",
+                        "[TransactionType] IN ('LineSideTransfer', 'OrderIssue', 'OrderReturn', 'Consumption', 'Reversal', 'Adjustment')");
+                    table.HasCheckConstraint(
+                        "CK_MaterialTransactions_Quantity",
+                        "[Quantity] > 0");
+                    table.HasCheckConstraint(
+                        "CK_MaterialTransactions_DeltaShape",
+                        "([TransactionType] = 'LineSideTransfer' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0) OR "
+                        + "([TransactionType] = 'OrderIssue' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = -[Quantity] AND [OrderAvailableQuantityDelta] = [Quantity] AND [OrderIssuedQuantityDelta] = [Quantity]) OR "
+                        + "([TransactionType] = 'OrderReturn' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = -[Quantity]) OR "
+                        + "([TransactionType] = 'Consumption' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = 0 AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = 0) OR "
+                        + "([TransactionType] = 'Reversal' AND [ReversesTransactionId] IS NOT NULL) OR "
+                        + "([TransactionType] = 'Adjustment' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND ABS([LineSideQuantityDelta]) = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0)");
+                    table.HasCheckConstraint(
+                        "CK_MaterialTransactions_Reason",
+                        "[TransactionType] NOT IN ('OrderReturn', 'Reversal', 'Adjustment') OR LEN([Reason]) > 0");
+                });
+            entity.HasKey(transaction => transaction.Id);
+            entity.Property(transaction => transaction.TransactionType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            entity.Property(transaction => transaction.LotNumber).HasMaxLength(120);
+            entity.Property(transaction => transaction.Quantity).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.Unit).HasMaxLength(24);
+            entity.Property(transaction => transaction.LineSideQuantityDelta).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.OrderAvailableQuantityDelta).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.OrderIssuedQuantityDelta).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.SourceSystem).HasMaxLength(80);
+            entity.Property(transaction => transaction.IdempotencyKey).HasMaxLength(120);
+            entity.Property(transaction => transaction.SourceDocumentType).HasMaxLength(80);
+            entity.Property(transaction => transaction.SourceDocumentNumber).HasMaxLength(160);
+            entity.Property(transaction => transaction.FromParty).HasMaxLength(160);
+            entity.Property(transaction => transaction.ToParty).HasMaxLength(160);
+            entity.Property(transaction => transaction.Reason).HasMaxLength(400);
+            entity.Property(transaction => transaction.CommandHash).HasMaxLength(64);
+            entity.Property(transaction => transaction.CommandHashAlgorithm).HasMaxLength(24);
+            entity.Property(transaction => transaction.CorrelationId).HasMaxLength(64);
+            entity.Property(transaction => transaction.LineSideBalanceAfter).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.OrderAvailableBalanceAfter).HasPrecision(18, 6);
+            entity.HasIndex(transaction => new
+            {
+                transaction.SourceSystem,
+                transaction.IdempotencyKey,
+            }).IsUnique();
+            entity.HasIndex(transaction => transaction.ReversesTransactionId)
+                .IsUnique()
+                .HasFilter("[ReversesTransactionId] IS NOT NULL");
+            entity.HasIndex(transaction => new
+            {
+                transaction.MaterialId,
+                transaction.LotNumber,
+                transaction.RecordedAtUtc,
+            });
+            entity.HasIndex(transaction => new
+            {
+                transaction.ProductionOrderId,
+                transaction.MaterialId,
+                transaction.LotNumber,
+                transaction.RecordedAtUtc,
+            });
+            entity.HasOne(transaction => transaction.Material)
+                .WithMany()
+                .HasForeignKey(transaction => transaction.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(transaction => transaction.ProductionOrder)
+                .WithMany()
+                .HasForeignKey(transaction => transaction.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(transaction => transaction.ReversesTransaction)
+                .WithMany()
+                .HasForeignKey(transaction => transaction.ReversesTransactionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(transaction => transaction.ActorUser)
+                .WithMany()
+                .HasForeignKey(transaction => transaction.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<ProductionOrder>(entity =>

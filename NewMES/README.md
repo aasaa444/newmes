@@ -42,6 +42,14 @@ Ticket 05 建立了生产订单下达、执行快照与受控生命周期：
 - 生命周期区分 `Received`、`Released`、`InProduction`、`Paused`、`ExecutionCompleted`、`Closed` 和投产前 `Cancelled`。
 - 工作台返回计划、投产、合格、报废、未投产和在制数量，以及快照版本和当前可执行命令。
 
+Ticket 06 建立了线边物料交接与工单发料事务账：
+
+- 交接、发料、退料、冲正和调整分别追加事务，线边及工单余额由事务增量汇总。
+- 物料基础单位来自可证明的主数据；旧数据缺失单位时拒绝记账，不猜测补值。
+- 发料检查线边余额、订单冻结 BOM 和跨 Lot 净发料上限，不产生产品实际耗用。
+- `SourceSystem + IdempotencyKey` 收敛重复和并发请求，SQL Server 阻止负库存、重复冲正及原事务改写。
+- 物料工作台按物料、Lot、订单和事务类型查看余额来源与历史。
+
 ## 工程结构
 
 ```text
@@ -67,4 +75,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达、执行快照与生命周期](docs/order-release-lifecycle.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
