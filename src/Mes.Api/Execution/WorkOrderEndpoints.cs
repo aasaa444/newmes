@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Mes.Api.Data;
 using Mes.Api.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Api.Execution;
@@ -46,15 +47,53 @@ public static class WorkOrderEndpoints
         });
 
         // ----- 工单 -----
-        read.MapGet("/work-orders", async (MesDbContext db) =>
+        // 列表（票 04）：支持 status / materialCode / q (orderNo|成品码) / materialIssued 过滤；
+        // 含 IssueLines 以便「已领料」徽标与下钻。
+        read.MapGet("/work-orders", async (
+            [FromQuery] string? status,
+            [FromQuery] string? materialCode,
+            [FromQuery] string? q,
+            [FromQuery] bool? materialIssued,
+            MesDbContext db) =>
         {
-            // 含用料行：列表可显示是否已领料（IssueLines 有数量即已领过）
             // 先物化再按 CreatedAt 排序：SQLite 不能 ORDER BY DateTimeOffset
             var rows = await db.WorkOrders.AsNoTracking()
                 .Include(w => w.FinishedMaterial)
                 .Include(w => w.IssueLines)
                 .ToListAsync();
-            return Results.Ok(rows.OrderByDescending(w => w.CreatedAt).Select(ToSummary).ToList());
+
+            IEnumerable<WorkOrder> filtered = rows;
+
+            if (!string.IsNullOrWhiteSpace(status)
+                && Enum.TryParse<WorkOrderStatus>(status, ignoreCase: true, out var st))
+            {
+                filtered = filtered.Where(w => w.Status == st);
+            }
+
+            if (!string.IsNullOrWhiteSpace(materialCode))
+            {
+                var code = materialCode.Trim().ToUpperInvariant();
+                filtered = filtered.Where(w =>
+                    w.FinishedMaterial != null
+                    && string.Equals(w.FinishedMaterial.Code, code, StringComparison.OrdinalIgnoreCase));
+            }
+
+            if (!string.IsNullOrWhiteSpace(q))
+            {
+                var needle = q.Trim();
+                filtered = filtered.Where(w =>
+                    w.OrderNo.Contains(needle, StringComparison.OrdinalIgnoreCase)
+                    || (w.FinishedMaterial != null
+                        && w.FinishedMaterial.Code.Contains(needle, StringComparison.OrdinalIgnoreCase)));
+            }
+
+            if (materialIssued is bool mi)
+            {
+                filtered = filtered.Where(w =>
+                    w.IssueLines.Any(l => l.IssuedQty > 0) == mi);
+            }
+
+            return Results.Ok(filtered.OrderByDescending(w => w.CreatedAt).Select(ToSummary).ToList());
         });
 
         read.MapGet("/work-orders/{id:guid}", async (Guid id, MesDbContext db) =>
