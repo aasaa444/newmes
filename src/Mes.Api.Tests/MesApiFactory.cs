@@ -13,7 +13,7 @@ namespace Mes.Api.Tests;
 
 /// <summary>
 /// 集成测试宿主：把真实 API 的 SQL Server 换成 SQLite 内存库。
-/// 环境名 Testing → Program 不注册 SQL Server、不跑 DatabaseBootstrap。
+/// 环境名 Testing → Program 不注册 SQL Server、不执行 SQL Server Migration 兼容性检查。
 /// 连接必须 Open 并保持，否则 :memory: 库会随连接关闭而消失。
 /// </summary>
 public class MesApiFactory : WebApplicationFactory<Program>

@@ -10,6 +10,18 @@ sqllocaldb start MSSQLLocalDB 2>$null | Out-Null
 $env:ASPNETCORE_ENVIRONMENT = "Development"
 $env:ASPNETCORE_URLS = "http://localhost:5101"
 
+Write-Host "Applying database migrations..." -ForegroundColor Cyan
+dotnet run --project $proj --no-launch-profile -- database migrate
+if ($LASTEXITCODE -ne 0) {
+  throw "Database migration failed. API was not started."
+}
+
+Write-Host "Loading explicit non-production demo data..." -ForegroundColor Cyan
+dotnet run --project $proj --no-launch-profile -- database seed-demo
+if ($LASTEXITCODE -ne 0) {
+  throw "Demo seed failed. API was not started."
+}
+
 Write-Host "Starting MES API -> http://localhost:5101  (Ctrl+C 正常退出)" -ForegroundColor Cyan
 Write-Host "若无 ApplicationStopping 日志就回到 PS 提示符，多半是进程被外部强杀。" -ForegroundColor DarkYellow
 dotnet run --project $proj --no-launch-profile

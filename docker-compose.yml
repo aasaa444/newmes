@@ -17,6 +17,32 @@ services:
       retries: 10
       start_period: 30s
 
+  migrate:
+    build:
+      context: ./src/Mes.Api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MesDb: "Server=db,1433;Database=MesDb;User Id=sa;Password=Mes_Dev_Passw0rd!;TrustServerCertificate=True"
+      Jwt__SigningKey: "DEV_ONLY_CHANGE_ME_TO_A_LONG_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS"
+    command: ["database", "migrate"]
+    depends_on:
+      db:
+        condition: service_healthy
+
+  seed-demo:
+    build:
+      context: ./src/Mes.Api
+      dockerfile: Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__MesDb: "Server=db,1433;Database=MesDb;User Id=sa;Password=Mes_Dev_Passw0rd!;TrustServerCertificate=True"
+      Jwt__SigningKey: "DEV_ONLY_CHANGE_ME_TO_A_LONG_RANDOM_SECRET_KEY_AT_LEAST_32_CHARS"
+    command: ["database", "seed-demo"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     build:
       context: ./src/Mes.Api
@@ -29,8 +55,8 @@ services:
     ports:
       - "8080:8080"
     depends_on:
-      db:
-        condition: service_healthy
+      seed-demo:
+        condition: service_completed_successfully
 
   web:
     build:

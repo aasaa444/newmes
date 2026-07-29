@@ -88,6 +88,17 @@ builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
 
+// 数据库安装、升级和演示初始化是显式运维命令；执行后退出，不启动 Web API。
+if (DatabaseCommandRunner.IsDatabaseCommand(args))
+{
+    Environment.ExitCode = await DatabaseCommandRunner.RunAsync(
+        args,
+        app.Services,
+        app.Environment,
+        app.Lifetime.ApplicationStopping);
+    return;
+}
+
 // 关机原因可见：若进程「自己停」，日志里应出现 ApplicationStopping / Stopped
 // （被任务管理器/Stop-Process 强杀时可能来不及打日志）
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
@@ -99,14 +110,12 @@ lifetime.ApplicationStopping.Register(() =>
 lifetime.ApplicationStopped.Register(() =>
     lifeLog.LogWarning("MES API 已停止 (ApplicationStopped)。"));
 
-// ----- 启动时建库 + 种子（Testing 由 Factory 自己 EnsureCreated/Seed）-----
+// 普通启动只验证数据库已由显式命令迁移；Testing 仍由测试宿主管理 SQLite。
 if (!app.Environment.IsEnvironment("Testing"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<MesDbContext>();
-    var logger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("DatabaseBootstrap");
-    // 解决：旧 MesDb 只有 Users 时 EnsureCreated 不补表 → Invalid object name 'Materials'
-    DatabaseBootstrap.Initialize(db, app.Environment, logger);
+    await DatabaseCompatibilityVerifier.EnsureCompatibleAsync(db);
 }
 
 if (app.Environment.IsDevelopment())

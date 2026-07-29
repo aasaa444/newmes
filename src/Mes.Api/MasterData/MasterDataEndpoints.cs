@@ -321,14 +321,6 @@ public static class MasterDataEndpoints
                 new StationResponse(station.Id, station.Code, station.Name, station.BoundProcessStepId, step.Code, station.ProductionLineId, station.IsActive));
         });
 
-        // 幂等补种（库空或被清空后可用）；已有 FG-ROUTER 则 no-op
-        write.MapPost("/master-data/seed", async (MesDbContext db, AuditService audit, ClaimsPrincipal user) =>
-        {
-            MasterDataSeed.EnsureSeeded(db);
-            await audit.WriteAsync("MasterDataSeeded", user.Identity?.Name ?? "", "MasterData", null, "EnsureSeeded");
-            return Results.Ok(new { seeded = true });
-        });
-
         return read;
     }
 }
