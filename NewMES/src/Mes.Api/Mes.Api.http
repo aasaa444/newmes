@@ -1,0 +1,9 @@
+@Mes.Api_HostAddress = http://localhost:5110
+
+GET {{Mes.Api_HostAddress}}/health/live
+Accept: application/json
+
+###
+
+GET {{Mes.Api_HostAddress}}/health/ready
+Accept: application/json

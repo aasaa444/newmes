@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Mes.Api/Mes.Api.csproj" />
+    <Project Path="src/Mes.DbMigrator/Mes.DbMigrator.csproj" />
+    <Project Path="src/Mes.Domain/Mes.Domain.csproj" />
+    <Project Path="src/Mes.Infrastructure/Mes.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Mes.Database.Tests/Mes.Database.Tests.csproj" />
+    <Project Path="tests/Mes.SqlServer.IntegrationTests/Mes.SqlServer.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
