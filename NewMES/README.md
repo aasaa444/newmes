@@ -58,6 +58,14 @@ Ticket 07 建立了受控产品身份、标签事件与 `START_WIP`：
 - SQL Server 在并发下阻止身份重复和计划外超投；暂停、未下达及终态订单禁止新投产。
 - 身份解绑/作废及标签打印、补打、作废、换标分别追加历史，换标不覆盖旧标签。
 
+Ticket 08 建立了装配绑定与三种粒度实际耗用：
+
+- 订单快照为每项直接物料冻结装配工序、`Serial` / `Lot` / `Quantity` 粒度及逐件实际耗用或订单回冲规则。
+- 序列件绑定部件 SN 时原子创建唯一有效关系和 `Consumption`；Lot 件记录 Lot 与实际数量；数量件可由冻结 BOM 自动回冲。
+- 线边交接、工单发料和实际耗用保持为不同事实；未交接、未发料、余额不足、物料或工序不匹配均拒绝且不留下部分事实。
+- 解绑和替换引用原关系与原事务，追加冲正及补偿事件；原关系、事务、事件和永久幂等回执不删除。
+- 工位需求显示待采集、已采集和剩余量；支持成品正查以及按关键件 SN 或 Lot 反查受影响成品。
+
 ## 工程结构
 
 ```text
@@ -83,4 +91,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；装配实际用料见 [装配绑定与三种粒度物料耗用](docs/assembly-material-consumption.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

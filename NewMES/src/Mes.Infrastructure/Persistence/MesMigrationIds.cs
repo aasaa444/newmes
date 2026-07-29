@@ -29,4 +29,7 @@ public static class MesMigrationIds
 
     public const string AuthorizedIdentitySourcesAndReceipts =
         "20260729190000_AuthorizedIdentitySourcesAndReceipts";
+
+    public const string AssemblyBindingConsumption =
+        "20260729200000_AssemblyBindingConsumption";
 }

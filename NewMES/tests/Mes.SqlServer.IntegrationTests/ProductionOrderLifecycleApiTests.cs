@@ -330,8 +330,8 @@ public sealed class ProductionOrderLifecycleApiTests(SqlServerFixture server)
                 version = $"BOM-{version}",
                 components = new object[]
             {
-                new { materialCode = "ROUTER-PCBA-01", quantityPer = 1m, unit = "EA", traceabilityMode = "Serial" },
-                new { materialCode = "ROUTER-ENCLOSURE-01", quantityPer = 1m, unit = "EA", traceabilityMode = "Lot" },
+                new { materialCode = "ROUTER-PCBA-01", quantityPer = 1m, unit = "EA", traceabilityMode = "Serial", assemblyOperationCode = "ASSEMBLY_BIND", consumptionRule = "PerProductActual" },
+                new { materialCode = "ROUTER-ENCLOSURE-01", quantityPer = 1m, unit = "EA", traceabilityMode = "Lot", assemblyOperationCode = "ASSEMBLY_BIND", consumptionRule = "PerProductActual" },
             },
             },
             route = new

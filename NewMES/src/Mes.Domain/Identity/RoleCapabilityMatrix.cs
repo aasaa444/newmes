@@ -21,16 +21,19 @@ public static class RoleCapabilityMatrix
             [BusinessRole.Operator] = Set(
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.StationExecute,
+                BusinessCapability.GenealogyRead,
                 BusinessCapability.DefectReport),
             [BusinessRole.LineSupervisor] = Set(
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.ProductionOrderRead,
                 BusinessCapability.LineExecutionRead,
+                BusinessCapability.GenealogyRead,
                 BusinessCapability.ProductionPauseRequest,
                 BusinessCapability.QualityQueueRead),
             [BusinessRole.QualityEngineer] = Set(
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.QualityQueueRead,
+                BusinessCapability.GenealogyRead,
                 BusinessCapability.QualityDispositionApprove,
                 BusinessCapability.QualityHoldRelease),
             [BusinessRole.MaterialHandler] = Set(
@@ -46,6 +49,7 @@ public static class RoleCapabilityMatrix
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.ProductionOrderRead,
                 BusinessCapability.LineExecutionRead,
+                BusinessCapability.GenealogyRead,
                 BusinessCapability.QualityQueueRead,
                 BusinessCapability.OperationsReportRead),
         };

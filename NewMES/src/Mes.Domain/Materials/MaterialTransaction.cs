@@ -18,6 +18,14 @@ public sealed class MaterialTransaction
 
     public ProductionOrder? ProductionOrder { get; init; }
 
+    public Guid? ProductIdentityId { get; init; }
+
+    public ProductIdentity? ProductIdentity { get; init; }
+
+    public string? OperationCode { get; init; }
+
+    public TraceabilityMode? TraceabilityMode { get; init; }
+
     public required string LotNumber { get; init; }
 
     public decimal Quantity { get; init; }

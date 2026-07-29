@@ -11,6 +11,7 @@ public enum BusinessCapability
     StationExecute,
     DefectReport,
     LineExecutionRead,
+    GenealogyRead,
     ProductionPauseRequest,
     QualityQueueRead,
     QualityDispositionApprove,

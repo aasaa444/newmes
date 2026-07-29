@@ -21,7 +21,9 @@ public sealed record BomComponentDefinition(
     string MaterialCode,
     decimal QuantityPer,
     string Unit,
-    string TraceabilityMode);
+    string TraceabilityMode,
+    string? AssemblyOperationCode = null,
+    string? ConsumptionRule = null);
 
 public sealed record RouteDefinition(
     string Version,

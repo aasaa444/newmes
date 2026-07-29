@@ -207,11 +207,27 @@ public sealed class ExecutionTemplateService(
 
         var bom = request.Bom!;
         var route = request.Route!;
+        var operationCodes = route.Operations
+            .Select(operation => operation.Code)
+            .ToHashSet(StringComparer.Ordinal);
         if (bom.Components.Any(component =>
                 string.IsNullOrWhiteSpace(component.MaterialCode)
                 || string.IsNullOrWhiteSpace(component.Unit)
+                || string.IsNullOrWhiteSpace(component.AssemblyOperationCode)
                 || component.QuantityPer <= 0
-                || !Enum.TryParse<TraceabilityMode>(component.TraceabilityMode, out _))
+                || !Enum.TryParse<TraceabilityMode>(component.TraceabilityMode, out var mode)
+                || !operationCodes.Contains(component.AssemblyOperationCode)
+                || !IsConsumptionRuleSupported(mode, component.ConsumptionRule)
+                || (mode == TraceabilityMode.Serial
+                    && component.QuantityPer != decimal.Truncate(component.QuantityPer)))
+            || bom.Components
+                .Select(component => new
+                {
+                    component.MaterialCode,
+                    component.AssemblyOperationCode,
+                })
+                .Distinct()
+                .Count() != bom.Components.Count
             || route.Operations.Any(operation =>
                 operation.Sequence <= 0
                 || string.IsNullOrWhiteSpace(operation.Code)
@@ -242,6 +258,18 @@ public sealed class ExecutionTemplateService(
 
         return null;
     }
+
+    private static bool IsConsumptionRuleSupported(
+        TraceabilityMode traceabilityMode,
+        string? consumptionRule) => traceabilityMode switch
+        {
+            TraceabilityMode.Serial or TraceabilityMode.Lot =>
+                string.Equals(consumptionRule, "PerProductActual", StringComparison.Ordinal),
+            TraceabilityMode.None =>
+                string.Equals(consumptionRule, "PerProductActual", StringComparison.Ordinal)
+                || string.Equals(consumptionRule, "OrderBackflush", StringComparison.Ordinal),
+            _ => false,
+        };
 
     private static readonly HashSet<string> SupportedSerialSources =
     [

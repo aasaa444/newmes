@@ -44,6 +44,11 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     public DbSet<StartWipCommandReceipt> StartWipCommandReceipts => Set<StartWipCommandReceipt>();
 
+    public DbSet<AssemblyComponentBinding> AssemblyComponentBindings =>
+        Set<AssemblyComponentBinding>();
+
+    public DbSet<AssemblyCommandReceipt> AssemblyCommandReceipts => Set<AssemblyCommandReceipt>();
+
     public DbSet<IdentitySourceRegistration> IdentitySourceRegistrations =>
         Set<IdentitySourceRegistration>();
 
@@ -178,7 +183,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                         "([TransactionType] = 'LineSideTransfer' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0) OR "
                         + "([TransactionType] = 'OrderIssue' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = -[Quantity] AND [OrderAvailableQuantityDelta] = [Quantity] AND [OrderIssuedQuantityDelta] = [Quantity]) OR "
                         + "([TransactionType] = 'OrderReturn' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = [Quantity] AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = -[Quantity]) OR "
-                        + "([TransactionType] = 'Consumption' AND [ProductionOrderId] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = 0 AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = 0) OR "
+                        + "([TransactionType] = 'Consumption' AND [ProductionOrderId] IS NOT NULL AND [ProductIdentityId] IS NOT NULL AND [OperationCode] IS NOT NULL AND [TraceabilityMode] IS NOT NULL AND [ReversesTransactionId] IS NULL AND [LineSideQuantityDelta] = 0 AND [OrderAvailableQuantityDelta] = -[Quantity] AND [OrderIssuedQuantityDelta] = 0) OR "
                         + "([TransactionType] = 'Reversal' AND [ReversesTransactionId] IS NOT NULL) OR "
                         + "([TransactionType] = 'Adjustment' AND [ProductionOrderId] IS NULL AND [ReversesTransactionId] IS NULL AND ABS([LineSideQuantityDelta]) = [Quantity] AND [OrderAvailableQuantityDelta] = 0 AND [OrderIssuedQuantityDelta] = 0)");
                     table.HasCheckConstraint(
@@ -195,6 +200,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.Property(transaction => transaction.LineSideQuantityDelta).HasPrecision(18, 6);
             entity.Property(transaction => transaction.OrderAvailableQuantityDelta).HasPrecision(18, 6);
             entity.Property(transaction => transaction.OrderIssuedQuantityDelta).HasPrecision(18, 6);
+            entity.Property(transaction => transaction.OperationCode).HasMaxLength(80);
+            entity.Property(transaction => transaction.TraceabilityMode)
+                .HasConversion<string>()
+                .HasMaxLength(16);
             entity.Property(transaction => transaction.SourceSystem).HasMaxLength(80);
             entity.Property(transaction => transaction.IdempotencyKey).HasMaxLength(120);
             entity.Property(transaction => transaction.SourceDocumentType).HasMaxLength(80);
@@ -228,6 +237,13 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 transaction.LotNumber,
                 transaction.RecordedAtUtc,
             });
+            entity.HasIndex(transaction => new
+            {
+                transaction.ProductIdentityId,
+                transaction.MaterialId,
+                transaction.OperationCode,
+                transaction.RecordedAtUtc,
+            });
             entity.HasOne(transaction => transaction.Material)
                 .WithMany()
                 .HasForeignKey(transaction => transaction.MaterialId)
@@ -235,6 +251,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne(transaction => transaction.ProductionOrder)
                 .WithMany()
                 .HasForeignKey(transaction => transaction.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(transaction => transaction.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(transaction => transaction.ProductIdentityId)
                 .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne(transaction => transaction.ReversesTransaction)
                 .WithMany()
@@ -422,6 +442,97 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne(identifier => identifier.ProductIdentity)
                 .WithMany()
                 .HasForeignKey(identifier => identifier.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AssemblyComponentBinding>(entity =>
+        {
+            entity.ToTable(
+                "AssemblyComponentBindings",
+                "mes",
+                table => table.HasCheckConstraint(
+                    "CK_AssemblyComponentBindings_State",
+                    "([IsActive] = 1 AND [UnboundAtUtc] IS NULL AND [UnboundByUserId] IS NULL AND [CorrectionReason] IS NULL) OR ([IsActive] = 0 AND [UnboundAtUtc] IS NOT NULL AND [UnboundByUserId] IS NOT NULL AND LEN([CorrectionReason]) > 0)"));
+            entity.HasKey(binding => binding.Id);
+            entity.Property(binding => binding.ComponentSerialNumber).HasMaxLength(200);
+            entity.Property(binding => binding.LotNumber).HasMaxLength(120);
+            entity.Property(binding => binding.Quantity).HasPrecision(18, 6);
+            entity.Property(binding => binding.Unit).HasMaxLength(24);
+            entity.Property(binding => binding.OperationCode).HasMaxLength(80);
+            entity.Property(binding => binding.CorrectionReason).HasMaxLength(400);
+            entity.Property(binding => binding.Version).IsRowVersion();
+            entity.HasIndex(binding => binding.ComponentSerialNumber)
+                .IsUnique()
+                .HasFilter("[IsActive] = 1");
+            entity.HasIndex(binding => new
+            {
+                binding.ProductIdentityId,
+                binding.MaterialId,
+                binding.OperationCode,
+                binding.IsActive,
+            });
+            entity.HasIndex(binding => binding.ConsumptionTransactionId).IsUnique();
+            entity.HasIndex(binding => binding.BindingEventId).IsUnique();
+            entity.HasOne(binding => binding.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(binding => binding.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>()
+                .WithMany()
+                .HasForeignKey(binding => binding.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrderExecutionSnapshot>()
+                .WithMany()
+                .HasForeignKey(binding => binding.ExecutionSnapshotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(binding => binding.Material)
+                .WithMany()
+                .HasForeignKey(binding => binding.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(binding => binding.ConsumptionTransaction)
+                .WithMany()
+                .HasForeignKey(binding => binding.ConsumptionTransactionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(binding => binding.BindingEvent)
+                .WithMany()
+                .HasForeignKey(binding => binding.BindingEventId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(binding => binding.BoundByUser)
+                .WithMany()
+                .HasForeignKey(binding => binding.BoundByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(binding => binding.UnboundByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AssemblyCommandReceipt>(entity =>
+        {
+            entity.ToTable(
+                "AssemblyCommandReceipts",
+                "mes",
+                table => table.HasTrigger("TR_AssemblyCommandReceipts_AppendOnly"));
+            entity.HasKey(receipt => receipt.Id);
+            entity.Property(receipt => receipt.SourceSystem).HasMaxLength(80);
+            entity.Property(receipt => receipt.IdempotencyKey).HasMaxLength(120);
+            entity.Property(receipt => receipt.CommandType).HasMaxLength(40);
+            entity.Property(receipt => receipt.CommandHash).HasMaxLength(64);
+            entity.Property(receipt => receipt.CommandHashAlgorithm).HasMaxLength(24);
+            entity.Property(receipt => receipt.ResultJson).HasColumnType("nvarchar(max)");
+            entity.HasIndex(receipt => new
+            {
+                receipt.SourceSystem,
+                receipt.IdempotencyKey,
+            }).IsUnique();
+            entity.HasIndex(receipt => new
+            {
+                receipt.ProductIdentityId,
+                receipt.CompletedAtUtc,
+            });
+            entity.HasOne<ProductIdentity>()
+                .WithMany()
+                .HasForeignKey(receipt => receipt.ProductIdentityId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

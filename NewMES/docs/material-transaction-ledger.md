@@ -11,7 +11,8 @@ Ticket 06 建立制造侧物料责任账，不扩展为完整 WMS。系统只记
 | `OrderReturn` | `+数量` | `-数量` | `-数量` | 把尚未耗用的订单物料退回线边，必须填写原因 |
 | `Reversal` | 原事务三个增量的相反数 | 同左 | 同左 | 精确补偿一条可冲正原事务，必须引用原事务并填写原因 |
 | `Adjustment` | `+/-数量` | `0` | `0` | 受控线边调整，必须填写原因且不得形成负库存 |
-| `Consumption` | `0` | `-数量` | `0` | 只保留数据库事务类型；Ticket 08 在具体工序、成品 SN 和追溯门禁下追加 |
+| `Consumption` | `0` | `-数量` | `0` | Ticket 08 只在具体工序、成品 SN 和冻结追溯门禁下追加，不能由物料工作台直接创建 |
+| `Reversal`（装配耗用冲正） | `0` | `+数量` | `0` | 引用原 `Consumption` 追加补偿事实；Lot/数量件走耗用冲正 API，序列件必须通过解绑或替换同步维护关系 |
 
 `LineSideBalance`、`OrderAvailableBalance` 和 `NetIssuedQuantity` 都由上述增量求和，不存在普通 API 可直接修改的余额字段。事务表由 SQL Server 拒绝更新和删除；更正只能追加退料、冲正或调整。
 
@@ -28,7 +29,7 @@ Ticket 06 建立制造侧物料责任账，不扩展为完整 WMS。系统只记
 - `POST /api/material/transactions/{id}/reverse`
 - `GET /api/material/workbench?materialCode=&lotNumber=&productionOrderId=&transactionType=`
 
-写接口需要 `MaterialTransactionExecute`，当前由物料交接员承担。操作工不能用这些接口把发料冒充耗用；后续工位服务只能通过 Ticket 08 的制造命令追加 `Consumption`。每个命令使用 `SourceSystem + IdempotencyKey` 唯一标识：完全重投返回原事务，不重复记账；相同键不同内容返回 `MATERIAL_IDEMPOTENCY_CONFLICT`。
+写接口需要 `MaterialTransactionExecute`，当前由物料交接员承担。操作工不能用这些接口把发料冒充耗用；Ticket 08 的装配服务通过独立 `StationExecute` 命令，在关系、工序和成品门禁下追加 `Consumption`。每个命令使用 `SourceSystem + IdempotencyKey` 唯一标识：完全重投返回原事务，不重复记账；相同键不同内容返回稳定冲突码。
 
 `line-side-transfers` 是物料交接员确认物理责任已经转移的 MES 领域命令，来源系统和单据仅作为可核对依据，不是让 WMS 匿名直写事务账的集成入口。未来自动化 ERP/WMS 适配器必须先经过通用 Inbox 保存原始载荷和处理结果，再以受控服务身份调用同一领域命令；该适配器不在 Ticket 06 范围内。
 
