@@ -34,7 +34,8 @@ public sealed record TraceabilityPolicyDefinition(string Version, string Finishe
 public sealed record IdentityPolicyDefinition(
     string Version,
     string FinishedSerialSource,
-    IReadOnlyList<string> RequiredIdentifiers);
+    IReadOnlyList<string> RequiredIdentifiers,
+    string AllocationTiming = "BeforeStartWip");
 
 public sealed record FirmwareRequirementDefinition(
     string Code,

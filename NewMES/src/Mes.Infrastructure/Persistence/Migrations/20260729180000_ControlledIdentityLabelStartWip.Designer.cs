@@ -4,6 +4,7 @@ using Mes.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Mes.Infrastructure.Persistence.Migrations
 {
     [DbContext(typeof(MesDbContext))]
-    partial class MesDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260729180000_ControlledIdentityLabelStartWip")]
+    partial class ControlledIdentityLabelStartWip
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -148,76 +151,11 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ControlledIdentifiers", "mes", t =>
                         {
-                            t.HasCheckConstraint("CK_ControlledIdentifiers_DemoFlag", "([SourceType] = 'DemoControlledPool' AND [IsDemo] = 1) OR ([SourceType] <> 'DemoControlledPool' AND [IsDemo] = 0)");
-
                             t.HasCheckConstraint("CK_ControlledIdentifiers_SourceType", "[SourceType] IN ('Erp', 'LabelSystem', 'MesControlledPool', 'DemoControlledPool')");
 
+                            t.HasCheckConstraint("CK_ControlledIdentifiers_DemoFlag", "([SourceType] = 'DemoControlledPool' AND [IsDemo] = 1) OR ([SourceType] <> 'DemoControlledPool' AND [IsDemo] = 0)");
+
                             t.HasCheckConstraint("CK_ControlledIdentifiers_Type", "[Type] IN ('SerialNumber', 'MacAddress', 'Imei', 'Certificate')");
-                        });
-                });
-
-            modelBuilder.Entity("Mes.Domain.Execution.IdentitySourceIdentifierGrant", b =>
-                {
-                    b.Property<Guid>("IdentitySourceRegistrationId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("IdentifierType")
-                        .HasMaxLength(24)
-                        .HasColumnType("nvarchar(24)");
-
-                    b.HasKey("IdentitySourceRegistrationId", "IdentifierType");
-
-                    b.ToTable("IdentitySourceIdentifierGrants", "mes");
-                });
-
-            modelBuilder.Entity("Mes.Domain.Execution.IdentitySourceRegistration", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("AuthorizationEvidence")
-                        .IsRequired()
-                        .HasMaxLength(400)
-                        .HasColumnType("nvarchar(400)");
-
-                    b.Property<Guid>("AuthorizedCallerUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("bit");
-
-                    b.Property<bool>("IsDemo")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTimeOffset>("RegisteredAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<Guid>("RegisteredByUserId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("SourceSystem")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("SourceType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AuthorizedCallerUserId");
-
-                    b.HasIndex("RegisteredByUserId");
-
-                    b.HasIndex("SourceSystem")
-                        .IsUnique();
-
-                    b.ToTable("IdentitySourceRegistrations", "mes", t =>
-                        {
-                            t.HasCheckConstraint("CK_IdentitySourceRegistrations_DemoFlag", "([SourceType] = 'DemoControlledPool' AND [IsDemo] = 1) OR ([SourceType] <> 'DemoControlledPool' AND [IsDemo] = 0)");
                         });
                 });
 
@@ -465,9 +403,9 @@ namespace Mes.Infrastructure.Persistence.Migrations
 
                     b.ToTable("ProductIdentities", "mes", t =>
                         {
-                            t.HasCheckConstraint("CK_ProductIdentities_BindingShape", "([Status] = 'Bound' AND [ProductionOrderId] IS NOT NULL AND [ExecutionSnapshotId] IS NOT NULL AND [BoundAtUtc] IS NOT NULL AND [StartSourceSystem] IS NOT NULL AND [StartIdempotencyKey] IS NOT NULL AND [StartCommandHash] IS NOT NULL) OR ([Status] IN ('Allocated', 'Voided') AND [ProductionOrderId] IS NULL AND [ExecutionSnapshotId] IS NULL AND [BoundAtUtc] IS NULL AND [StartSourceSystem] IS NULL AND [StartIdempotencyKey] IS NULL AND [StartCommandHash] IS NULL)");
-
                             t.HasCheckConstraint("CK_ProductIdentities_Status", "[Status] IN ('Allocated', 'Bound', 'Voided')");
+
+                            t.HasCheckConstraint("CK_ProductIdentities_BindingShape", "([Status] = 'Bound' AND [ProductionOrderId] IS NOT NULL AND [ExecutionSnapshotId] IS NOT NULL AND [BoundAtUtc] IS NOT NULL AND [StartSourceSystem] IS NOT NULL AND [StartIdempotencyKey] IS NOT NULL AND [StartCommandHash] IS NOT NULL) OR ([Status] IN ('Allocated', 'Voided') AND [ProductionOrderId] IS NULL AND [ExecutionSnapshotId] IS NULL AND [BoundAtUtc] IS NULL AND [StartSourceSystem] IS NULL AND [StartIdempotencyKey] IS NULL AND [StartCommandHash] IS NULL)");
                         });
                 });
 
@@ -659,88 +597,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.ToTable("ProductionOrderExecutionSnapshots", "mes", t =>
                         {
                             t.HasTrigger("TR_ProductionOrderExecutionSnapshots_AppendOnly");
-                        });
-
-                    b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
-                });
-
-            modelBuilder.Entity("Mes.Domain.Execution.StartWipCommandReceipt", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("CommandHash")
-                        .IsRequired()
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
-                    b.Property<DateTimeOffset>("CompletedAtUtc")
-                        .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("IdempotencyKey")
-                        .IsRequired()
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<string>("IdentitySourceSystem")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("IdentitySourceType")
-                        .IsRequired()
-                        .HasMaxLength(32)
-                        .HasColumnType("nvarchar(32)");
-
-                    b.Property<bool>("IsDemo")
-                        .HasColumnType("bit");
-
-                    b.Property<string>("NextOperationCode")
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("OrderStatus")
-                        .IsRequired()
-                        .HasMaxLength(24)
-                        .HasColumnType("nvarchar(24)");
-
-                    b.Property<Guid>("ProductIdentityId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ProductionOrderId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("ProductionOrderNumber")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<string>("SerialNumber")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
-                    b.Property<string>("SourceSystem")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("nvarchar(80)");
-
-                    b.Property<int>("StartedQuantity")
-                        .HasColumnType("int");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ProductionOrderId");
-
-                    b.HasIndex("ProductIdentityId", "CompletedAtUtc");
-
-                    b.HasIndex("SourceSystem", "IdempotencyKey")
-                        .IsUnique();
-
-                    b.ToTable("StartWipCommandReceipts", "mes", t =>
-                        {
-                            t.HasTrigger("TR_StartWipCommandReceipts_AppendOnly");
                         });
 
                     b.HasAnnotation("SqlServer:UseSqlOutputClause", false);
@@ -1136,36 +992,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductIdentity");
                 });
 
-            modelBuilder.Entity("Mes.Domain.Execution.IdentitySourceIdentifierGrant", b =>
-                {
-                    b.HasOne("Mes.Domain.Execution.IdentitySourceRegistration", "IdentitySourceRegistration")
-                        .WithMany("IdentifierGrants")
-                        .HasForeignKey("IdentitySourceRegistrationId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("IdentitySourceRegistration");
-                });
-
-            modelBuilder.Entity("Mes.Domain.Execution.IdentitySourceRegistration", b =>
-                {
-                    b.HasOne("Mes.Domain.Identity.UserAccount", "AuthorizedCallerUser")
-                        .WithMany()
-                        .HasForeignKey("AuthorizedCallerUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Mes.Domain.Identity.UserAccount", "RegisteredByUser")
-                        .WithMany()
-                        .HasForeignKey("RegisteredByUserId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("AuthorizedCallerUser");
-
-                    b.Navigation("RegisteredByUser");
-                });
-
             modelBuilder.Entity("Mes.Domain.Execution.ManufacturingEvent", b =>
                 {
                     b.HasOne("Mes.Domain.Execution.ManufacturingEvent", "CausationEvent")
@@ -1283,21 +1109,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Navigation("SourceTemplate");
                 });
 
-            modelBuilder.Entity("Mes.Domain.Execution.StartWipCommandReceipt", b =>
-                {
-                    b.HasOne("Mes.Domain.Execution.ProductIdentity", null)
-                        .WithMany()
-                        .HasForeignKey("ProductIdentityId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("Mes.Domain.Execution.ProductionOrder", null)
-                        .WithMany()
-                        .HasForeignKey("ProductionOrderId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("Mes.Domain.Identity.UserRoleAssignment", b =>
                 {
                     b.HasOne("Mes.Domain.Identity.UserAccount", "UserAccount")
@@ -1361,11 +1172,6 @@ namespace Mes.Infrastructure.Persistence.Migrations
                     b.Navigation("ProductionOrder");
 
                     b.Navigation("ReversesTransaction");
-                });
-
-            modelBuilder.Entity("Mes.Domain.Execution.IdentitySourceRegistration", b =>
-                {
-                    b.Navigation("IdentifierGrants");
                 });
 
             modelBuilder.Entity("Mes.Domain.Identity.UserAccount", b =>

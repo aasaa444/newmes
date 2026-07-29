@@ -36,6 +36,20 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     public DbSet<ManufacturingEvent> ManufacturingEvents => Set<ManufacturingEvent>();
 
+    public DbSet<ProductIdentity> ProductIdentities => Set<ProductIdentity>();
+
+    public DbSet<ControlledIdentifier> ControlledIdentifiers => Set<ControlledIdentifier>();
+
+    public DbSet<ProductLabel> ProductLabels => Set<ProductLabel>();
+
+    public DbSet<StartWipCommandReceipt> StartWipCommandReceipts => Set<StartWipCommandReceipt>();
+
+    public DbSet<IdentitySourceRegistration> IdentitySourceRegistrations =>
+        Set<IdentitySourceRegistration>();
+
+    public DbSet<IdentitySourceIdentifierGrant> IdentitySourceIdentifierGrants =>
+        Set<IdentitySourceIdentifierGrant>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<UserAccount>(entity =>
@@ -318,6 +332,196 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        modelBuilder.Entity<ProductIdentity>(entity =>
+        {
+            entity.ToTable(
+                "ProductIdentities",
+                "mes",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_ProductIdentities_Status",
+                        "[Status] IN ('Allocated', 'Bound', 'Voided')");
+                    table.HasCheckConstraint(
+                        "CK_ProductIdentities_BindingShape",
+                        "([Status] = 'Bound' AND [ProductionOrderId] IS NOT NULL AND [ExecutionSnapshotId] IS NOT NULL AND [BoundAtUtc] IS NOT NULL AND [StartSourceSystem] IS NOT NULL AND [StartIdempotencyKey] IS NOT NULL AND [StartCommandHash] IS NOT NULL) OR ([Status] IN ('Allocated', 'Voided') AND [ProductionOrderId] IS NULL AND [ExecutionSnapshotId] IS NULL AND [BoundAtUtc] IS NULL AND [StartSourceSystem] IS NULL AND [StartIdempotencyKey] IS NULL AND [StartCommandHash] IS NULL)");
+                });
+            entity.HasKey(identity => identity.Id);
+            entity.Property(identity => identity.SerialNumber).HasMaxLength(200);
+            entity.Property(identity => identity.SerialSourceType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            entity.Property(identity => identity.SerialSourceSystem).HasMaxLength(80);
+            entity.Property(identity => identity.SerialSourceReference).HasMaxLength(200);
+            entity.Property(identity => identity.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+            entity.Property(identity => identity.NextOperationCode).HasMaxLength(80);
+            entity.Property(identity => identity.StartSourceSystem).HasMaxLength(80);
+            entity.Property(identity => identity.StartIdempotencyKey).HasMaxLength(120);
+            entity.Property(identity => identity.StartCommandHash).HasMaxLength(64);
+            entity.Property(identity => identity.AllocationSourceSystem).HasMaxLength(80);
+            entity.Property(identity => identity.AllocationIdempotencyKey).HasMaxLength(120);
+            entity.Property(identity => identity.AllocationCommandHash).HasMaxLength(64);
+            entity.Property(identity => identity.Version).IsRowVersion();
+            entity.HasIndex(identity => identity.SerialNumber).IsUnique();
+            entity.HasIndex(identity => new
+            {
+                identity.AllocationSourceSystem,
+                identity.AllocationIdempotencyKey,
+            }).IsUnique();
+            entity.HasIndex(identity => new
+            {
+                identity.StartSourceSystem,
+                identity.StartIdempotencyKey,
+            }).IsUnique().HasFilter(
+                "[StartSourceSystem] IS NOT NULL AND [StartIdempotencyKey] IS NOT NULL");
+            entity.HasOne(identity => identity.Material)
+                .WithMany()
+                .HasForeignKey(identity => identity.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(identity => identity.ProductionOrder)
+                .WithMany()
+                .HasForeignKey(identity => identity.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(identity => identity.ExecutionSnapshot)
+                .WithMany()
+                .HasForeignKey(identity => identity.ExecutionSnapshotId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ControlledIdentifier>(entity =>
+        {
+            entity.ToTable(
+                "ControlledIdentifiers",
+                "mes",
+                table =>
+                {
+                    table.HasCheckConstraint(
+                        "CK_ControlledIdentifiers_Type",
+                        "[Type] IN ('SerialNumber', 'MacAddress', 'Imei', 'Certificate')");
+                    table.HasCheckConstraint(
+                        "CK_ControlledIdentifiers_SourceType",
+                        "[SourceType] IN ('Erp', 'LabelSystem', 'MesControlledPool', 'DemoControlledPool')");
+                    table.HasCheckConstraint(
+                        "CK_ControlledIdentifiers_DemoFlag",
+                        "([SourceType] = 'DemoControlledPool' AND [IsDemo] = 1) OR ([SourceType] <> 'DemoControlledPool' AND [IsDemo] = 0)");
+                });
+            entity.HasKey(identifier => identifier.Id);
+            entity.Property(identifier => identifier.Type)
+                .HasConversion<string>()
+                .HasMaxLength(24);
+            entity.Property(identifier => identifier.Value).HasMaxLength(200);
+            entity.Property(identifier => identifier.SourceType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            entity.Property(identifier => identifier.SourceSystem).HasMaxLength(80);
+            entity.Property(identifier => identifier.SourceReference).HasMaxLength(200);
+            entity.HasIndex(identifier => new { identifier.Type, identifier.Value }).IsUnique();
+            entity.HasIndex(identifier => new { identifier.ProductIdentityId, identifier.Type }).IsUnique();
+            entity.HasOne(identifier => identifier.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(identifier => identifier.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProductLabel>(entity =>
+        {
+            entity.ToTable(
+                "ProductLabels",
+                "mes",
+                table => table.HasCheckConstraint(
+                    "CK_ProductLabels_Status",
+                    "[Status] IN ('Active', 'Voided', 'Replaced')"));
+            entity.HasKey(label => label.Id);
+            entity.Property(label => label.TemplateVersion).HasMaxLength(80);
+            entity.Property(label => label.Printer).HasMaxLength(160);
+            entity.Property(label => label.Status)
+                .HasConversion<string>()
+                .HasMaxLength(16);
+            entity.Property(label => label.Version).IsRowVersion();
+            entity.HasIndex(label => new { label.ProductIdentityId, label.CreatedAtUtc });
+            entity.HasOne(label => label.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(label => label.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(label => label.ReplacesLabel)
+                .WithMany()
+                .HasForeignKey(label => label.ReplacesLabelId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<StartWipCommandReceipt>(entity =>
+        {
+            entity.ToTable(
+                "StartWipCommandReceipts",
+                "mes",
+                table => table.HasTrigger("TR_StartWipCommandReceipts_AppendOnly"));
+            entity.HasKey(receipt => receipt.Id);
+            entity.Property(receipt => receipt.SourceSystem).HasMaxLength(80);
+            entity.Property(receipt => receipt.IdempotencyKey).HasMaxLength(120);
+            entity.Property(receipt => receipt.CommandHash).HasMaxLength(64);
+            entity.Property(receipt => receipt.SerialNumber).HasMaxLength(200);
+            entity.Property(receipt => receipt.ProductionOrderNumber).HasMaxLength(80);
+            entity.Property(receipt => receipt.OrderStatus).HasMaxLength(24);
+            entity.Property(receipt => receipt.IdentitySourceSystem).HasMaxLength(80);
+            entity.Property(receipt => receipt.IdentitySourceType).HasMaxLength(32);
+            entity.Property(receipt => receipt.NextOperationCode).HasMaxLength(80);
+            entity.HasIndex(receipt => new { receipt.SourceSystem, receipt.IdempotencyKey })
+                .IsUnique();
+            entity.HasIndex(receipt => new { receipt.ProductIdentityId, receipt.CompletedAtUtc });
+            entity.HasOne<ProductIdentity>()
+                .WithMany()
+                .HasForeignKey(receipt => receipt.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>()
+                .WithMany()
+                .HasForeignKey(receipt => receipt.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<IdentitySourceRegistration>(entity =>
+        {
+            entity.ToTable(
+                "IdentitySourceRegistrations",
+                "mes",
+                table => table.HasCheckConstraint(
+                    "CK_IdentitySourceRegistrations_DemoFlag",
+                    "([SourceType] = 'DemoControlledPool' AND [IsDemo] = 1) OR ([SourceType] <> 'DemoControlledPool' AND [IsDemo] = 0)"));
+            entity.HasKey(source => source.Id);
+            entity.Property(source => source.SourceSystem).HasMaxLength(80);
+            entity.Property(source => source.SourceType)
+                .HasConversion<string>()
+                .HasMaxLength(32);
+            entity.Property(source => source.AuthorizationEvidence).HasMaxLength(400);
+            entity.HasIndex(source => source.SourceSystem).IsUnique();
+            entity.HasOne(source => source.AuthorizedCallerUser)
+                .WithMany()
+                .HasForeignKey(source => source.AuthorizedCallerUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(source => source.RegisteredByUser)
+                .WithMany()
+                .HasForeignKey(source => source.RegisteredByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<IdentitySourceIdentifierGrant>(entity =>
+        {
+            entity.ToTable("IdentitySourceIdentifierGrants", "mes");
+            entity.HasKey(grant => new
+            {
+                grant.IdentitySourceRegistrationId,
+                grant.IdentifierType,
+            });
+            entity.Property(grant => grant.IdentifierType)
+                .HasConversion<string>()
+                .HasMaxLength(24);
+            entity.HasOne(grant => grant.IdentitySourceRegistration)
+                .WithMany(source => source.IdentifierGrants)
+                .HasForeignKey(grant => grant.IdentitySourceRegistrationId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         modelBuilder.Entity<IntegrationInboxMessage>(entity =>
         {
             entity.ToTable(
@@ -401,15 +605,31 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.Property(manufacturingEvent => manufacturingEvent.AggregateId).HasMaxLength(160);
             entity.Property(manufacturingEvent => manufacturingEvent.Actor).HasMaxLength(160);
             entity.Property(manufacturingEvent => manufacturingEvent.PayloadJson).HasColumnType("nvarchar(max)");
+            entity.Property(manufacturingEvent => manufacturingEvent.Location).HasMaxLength(120);
+            entity.Property(manufacturingEvent => manufacturingEvent.CorrelationId).HasMaxLength(64);
             entity.HasIndex(manufacturingEvent => new
             {
                 manufacturingEvent.AggregateType,
                 manufacturingEvent.AggregateId,
                 manufacturingEvent.OccurredAtUtc,
             });
+            entity.HasIndex(manufacturingEvent => new
+            {
+                manufacturingEvent.ProductIdentityId,
+                manufacturingEvent.RecordedAtUtc,
+            });
+            entity.HasIndex(manufacturingEvent => new
+            {
+                manufacturingEvent.ProductionOrderId,
+                manufacturingEvent.RecordedAtUtc,
+            });
             entity.HasOne(manufacturingEvent => manufacturingEvent.CorrectsEvent)
                 .WithMany()
                 .HasForeignKey(manufacturingEvent => manufacturingEvent.CorrectsEventId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(manufacturingEvent => manufacturingEvent.CausationEvent)
+                .WithMany()
+                .HasForeignKey(manufacturingEvent => manufacturingEvent.CausationEventId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
     }

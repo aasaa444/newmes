@@ -27,6 +27,8 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.PreserveRejectedIngressGaps,
         MesMigrationIds.OrderReleaseSnapshotLifecycle,
         MesMigrationIds.LineSideMaterialTransactionLedger,
+        MesMigrationIds.ControlledIdentityLabelStartWip,
+        MesMigrationIds.AuthorizedIdentitySourcesAndReceipts,
     ];
 
     [SqlServerFact]
@@ -41,6 +43,11 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.True(await TableExistsAsync(context, "ManufacturingEvents"));
         Assert.True(await TableExistsAsync(context, "IntegrationInboxMessages"));
         Assert.True(await TableExistsAsync(context, "MaterialTransactions"));
+        Assert.True(await TableExistsAsync(context, "ProductIdentities"));
+        Assert.True(await TableExistsAsync(context, "ControlledIdentifiers"));
+        Assert.True(await TableExistsAsync(context, "ProductLabels"));
+        Assert.True(await TableExistsAsync(context, "IdentitySourceRegistrations"));
+        Assert.True(await TableExistsAsync(context, "StartWipCommandReceipts"));
     }
 
     [SqlServerFact]
@@ -83,6 +90,40 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             .Select(material => material.BaseUnit)
             .SingleAsync());
         Assert.False(await context.ManufacturingEvents.AnyAsync());
+    }
+
+    [SqlServerFact]
+    public async Task Ticket06EventUpgradesWithConservativeRecordedTimeAndAppendOnlyProtection()
+    {
+        await using var context = CreateContext(await server.CreateDatabaseAsync());
+        var migrator = context.Database.GetService<IMigrator>();
+        await migrator.MigrateAsync(MesMigrationIds.LineSideMaterialTransactionLedger);
+        var eventId = Guid.NewGuid();
+        var occurredAt = DateTimeOffset.Parse(
+            "2026-07-28T12:34:56+00:00",
+            CultureInfo.InvariantCulture);
+        await context.Database.ExecuteSqlInterpolatedAsync($$"""
+            INSERT INTO [mes].[ManufacturingEvents]
+                ([Id], [EventType], [AggregateType], [AggregateId], [OccurredAtUtc],
+                 [Actor], [PayloadJson], [CorrectsEventId])
+            VALUES
+                ({{eventId}}, N'LEGACY_EVENT', N'ProductionOrder', N'PO-UPGRADE-07',
+                 {{occurredAt}}, N'upgrade-test', N'{}', NULL);
+            """);
+
+        await context.Database.MigrateAsync();
+
+        var upgraded = await context.ManufacturingEvents
+            .AsNoTracking()
+            .SingleAsync(item => item.Id == eventId);
+        Assert.Equal(occurredAt, upgraded.RecordedAtUtc);
+        var updateError = await Assert.ThrowsAsync<SqlException>(() =>
+            context.Database.ExecuteSqlInterpolatedAsync($$"""
+                UPDATE [mes].[ManufacturingEvents]
+                SET [Actor] = N'tampered'
+                WHERE [Id] = {{eventId}};
+                """));
+        Assert.Equal(51001, updateError.Number);
     }
 
     [SqlServerFact]
@@ -218,6 +259,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
             AggregateType = "ProductionOrder",
             AggregateId = "PO-APPEND-ONLY",
             OccurredAtUtc = DateTimeOffset.UtcNow,
+            RecordedAtUtc = DateTimeOffset.UtcNow,
             Actor = "sql-server-gate",
             PayloadJson = "{}",
         });

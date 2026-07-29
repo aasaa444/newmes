@@ -23,4 +23,10 @@ public static class MesMigrationIds
 
     public const string LineSideMaterialTransactionLedger =
         "20260729170000_LineSideMaterialTransactionLedger";
+
+    public const string ControlledIdentityLabelStartWip =
+        "20260729180000_ControlledIdentityLabelStartWip";
+
+    public const string AuthorizedIdentitySourcesAndReceipts =
+        "20260729190000_AuthorizedIdentitySourcesAndReceipts";
 }

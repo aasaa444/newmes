@@ -192,6 +192,7 @@ public sealed class ExecutionTemplateService(
             || string.IsNullOrWhiteSpace(request.TraceabilityPolicy?.Version)
             || string.IsNullOrWhiteSpace(request.IdentityPolicy?.Version)
             || string.IsNullOrWhiteSpace(request.IdentityPolicy?.FinishedSerialSource)
+            || string.IsNullOrWhiteSpace(request.IdentityPolicy?.AllocationTiming)
             || string.IsNullOrWhiteSpace(request.CompletionGate?.Version);
         var collectionMissing = request.Bom?.Components is not { Count: > 0 }
             || request.Route?.Operations is not { Count: > 0 }
@@ -222,6 +223,8 @@ public sealed class ExecutionTemplateService(
             || request.IdentityPolicy!.RequiredIdentifiers.Any(string.IsNullOrWhiteSpace)
             || request.IdentityPolicy.RequiredIdentifiers.Distinct(StringComparer.Ordinal).Count()
                 != request.IdentityPolicy.RequiredIdentifiers.Count
+            || !SupportedSerialSources.Contains(request.IdentityPolicy.FinishedSerialSource)
+            || !SupportedAllocationTimings.Contains(request.IdentityPolicy.AllocationTiming)
             || request.FirmwareRequirements.Any(requirement =>
                 string.IsNullOrWhiteSpace(requirement.Code)
                 || string.IsNullOrWhiteSpace(requirement.Version)
@@ -239,6 +242,22 @@ public sealed class ExecutionTemplateService(
 
         return null;
     }
+
+    private static readonly HashSet<string> SupportedSerialSources =
+    [
+        "ERP",
+        "LabelSystem",
+        "MesControlledPool",
+        "DemoControlledPool",
+        "AuthorizedExternalOrControlledPool",
+    ];
+
+    private static readonly HashSet<string> SupportedAllocationTimings =
+    [
+        "AtOrderRelease",
+        "BeforeStartWip",
+        "OnDemandBeforeStartWip",
+    ];
 
     private static ExecutionTemplateRejectedException InvalidTemplate() => new(
         "EXECUTION_TEMPLATE_INVALID",

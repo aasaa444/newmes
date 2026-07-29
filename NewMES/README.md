@@ -50,6 +50,14 @@ Ticket 06 建立了线边物料交接与工单发料事务账：
 - `SourceSystem + IdempotencyKey` 收敛重复和并发请求，SQL Server 阻止负库存、重复冲正及原事务改写。
 - 物料工作台按物料、Lot、订单和事务类型查看余额来源与历史。
 
+Ticket 07 建立了受控产品身份、标签事件与 `START_WIP`：
+
+- ERP、标签系统、MES 受控号池和明确的演示号池先注册授权调用账号、标识类型和依据，再使用同一来源契约；SN、MAC、IMEI 和证书均保留来源证明。
+- 订单冻结身份策略决定允许的 SN 来源、必需标识和分配时机，工位不随机生成生产身份。
+- `START_WIP` 原子绑定身份、订单和执行快照，追加制造事件、命令回执并增加订单投产数；纠错后完全重投也不重复计数。
+- SQL Server 在并发下阻止身份重复和计划外超投；暂停、未下达及终态订单禁止新投产。
+- 身份解绑/作废及标签打印、补打、作废、换标分别追加历史，换标不覆盖旧标签。
+
 ## 工程结构
 
 ```text
@@ -75,4 +83,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

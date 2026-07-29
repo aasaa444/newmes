@@ -69,6 +69,7 @@ builder.Services.AddScoped<ExecutionTemplateService>();
 builder.Services.AddScoped<ProductionOrderLifecycleService>();
 builder.Services.AddScoped<MaterialTransactionService>();
 builder.Services.AddScoped<MaterialWorkbenchQueryService>();
+builder.Services.AddScoped<ProductIdentityService>();
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<JwtTokenIssuer>();
@@ -183,6 +184,7 @@ app.MapProductionOrderEndpoints(app.Environment.IsDevelopment());
 app.MapExecutionTemplateEndpoints();
 app.MapProductionOrderLifecycleEndpoints();
 app.MapMaterialTransactionEndpoints();
+app.MapProductIdentityEndpoints();
 
 app.Run();
 
