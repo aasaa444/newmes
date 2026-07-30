@@ -30,6 +30,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.ControlledIdentityLabelStartWip,
         MesMigrationIds.AuthorizedIdentitySourcesAndReceipts,
         MesMigrationIds.AssemblyBindingConsumption,
+        MesMigrationIds.FirmwareConfigurationExecution,
     ];
 
     [SqlServerFact]

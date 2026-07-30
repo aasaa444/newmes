@@ -43,7 +43,11 @@ public sealed record FirmwareRequirementDefinition(
     string Code,
     string Version,
     bool Required,
-    string EvidenceReference);
+    string EvidenceReference,
+    string? OperationCode = null,
+    string? ConfigurationPackage = null,
+    string? ChecksumAlgorithm = null,
+    string? ExpectedChecksum = null);
 
 public sealed record TestSpecificationReferenceDefinition(
     string Code,

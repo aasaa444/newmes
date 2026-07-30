@@ -49,6 +49,9 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     public DbSet<AssemblyCommandReceipt> AssemblyCommandReceipts => Set<AssemblyCommandReceipt>();
 
+    public DbSet<FirmwareConfigurationExecution> FirmwareConfigurationExecutions =>
+        Set<FirmwareConfigurationExecution>();
+
     public DbSet<IdentitySourceRegistration> IdentitySourceRegistrations =>
         Set<IdentitySourceRegistration>();
 
@@ -533,6 +536,82 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne<ProductIdentity>()
                 .WithMany()
                 .HasForeignKey(receipt => receipt.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FirmwareConfigurationExecution>(entity =>
+        {
+            entity.ToTable(
+                "FirmwareConfigurationExecutions",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_FirmwareConfigurationExecutions_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_FirmwareConfigurationExecutions_Result",
+                        "[Result] IN ('Succeeded', 'Failed')");
+                    table.HasCheckConstraint(
+                        "CK_FirmwareConfigurationExecutions_Time",
+                        "[EndedAtUtc] >= [StartedAtUtc]");
+                });
+            entity.HasKey(execution => execution.Id);
+            entity.Property(execution => execution.RequirementCode).HasMaxLength(80);
+            entity.Property(execution => execution.OperationCode).HasMaxLength(80);
+            entity.Property(execution => execution.RequiredVersion).HasMaxLength(120);
+            entity.Property(execution => execution.ActualVersion).HasMaxLength(120);
+            entity.Property(execution => execution.RequiredConfigurationPackage).HasMaxLength(160);
+            entity.Property(execution => execution.ActualConfigurationPackage).HasMaxLength(160);
+            entity.Property(execution => execution.RequiredChecksumAlgorithm).HasMaxLength(40);
+            entity.Property(execution => execution.ActualChecksumAlgorithm).HasMaxLength(40);
+            entity.Property(execution => execution.ExpectedChecksum).HasMaxLength(256);
+            entity.Property(execution => execution.ActualChecksum).HasMaxLength(256);
+            entity.Property(execution => execution.ToolId).HasMaxLength(120);
+            entity.Property(execution => execution.ToolVersion).HasMaxLength(80);
+            entity.Property(execution => execution.Result).HasConversion<string>().HasMaxLength(16);
+            entity.Property(execution => execution.NextOperationCodeAfter).HasMaxLength(80);
+            entity.Property(execution => execution.DiagnosticCode).HasMaxLength(80);
+            entity.Property(execution => execution.DiagnosticMessage).HasMaxLength(1000);
+            entity.Property(execution => execution.ReportedDiagnosticCode).HasMaxLength(80);
+            entity.Property(execution => execution.ReportedDiagnosticMessage).HasMaxLength(1000);
+            entity.Property(execution => execution.SourceSystem).HasMaxLength(80);
+            entity.Property(execution => execution.IdempotencyKey).HasMaxLength(120);
+            entity.Property(execution => execution.CommandHash).HasMaxLength(64);
+            entity.Property(execution => execution.CommandHashAlgorithm).HasMaxLength(24);
+            entity.Property(execution => execution.ActorUsername).HasMaxLength(120);
+            entity.Property(execution => execution.Location).HasMaxLength(120);
+            entity.Property(execution => execution.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(execution => new { execution.SourceSystem, execution.IdempotencyKey })
+                .IsUnique();
+            entity.HasIndex(execution => new
+            {
+                execution.ProductIdentityId,
+                execution.RequirementCode,
+            }).IsUnique().HasFilter("[Result] = 'Succeeded'");
+            entity.HasIndex(execution => new { execution.ProductIdentityId, execution.RecordedAtUtc });
+            entity.HasIndex(execution => execution.ManufacturingEventId).IsUnique();
+            entity.HasOne(execution => execution.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(execution => execution.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>()
+                .WithMany()
+                .HasForeignKey(execution => execution.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrderExecutionSnapshot>()
+                .WithMany()
+                .HasForeignKey(execution => execution.ExecutionSnapshotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(execution => execution.RetryOfExecution)
+                .WithMany()
+                .HasForeignKey(execution => execution.RetryOfExecutionId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(execution => execution.ManufacturingEvent)
+                .WithMany()
+                .HasForeignKey(execution => execution.ManufacturingEventId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(execution => execution.ActorUserId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

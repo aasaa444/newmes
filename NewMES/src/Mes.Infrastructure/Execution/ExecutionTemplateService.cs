@@ -244,7 +244,14 @@ public sealed class ExecutionTemplateService(
             || request.FirmwareRequirements.Any(requirement =>
                 string.IsNullOrWhiteSpace(requirement.Code)
                 || string.IsNullOrWhiteSpace(requirement.Version)
-                || string.IsNullOrWhiteSpace(requirement.EvidenceReference))
+                || string.IsNullOrWhiteSpace(requirement.EvidenceReference)
+                || string.IsNullOrWhiteSpace(requirement.OperationCode)
+                || string.IsNullOrWhiteSpace(requirement.ConfigurationPackage)
+                || string.IsNullOrWhiteSpace(requirement.ChecksumAlgorithm)
+                || string.IsNullOrWhiteSpace(requirement.ExpectedChecksum)
+                || !operationCodes.Contains(requirement.OperationCode))
+            || request.FirmwareRequirements.Select(requirement => requirement.Code)
+                .Distinct(StringComparer.Ordinal).Count() != request.FirmwareRequirements.Count
             || request.TestSpecifications.Any(specification =>
                 string.IsNullOrWhiteSpace(specification.Code)
                 || string.IsNullOrWhiteSpace(specification.Version)

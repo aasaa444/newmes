@@ -32,4 +32,7 @@ public static class MesMigrationIds
 
     public const string AssemblyBindingConsumption =
         "20260729200000_AssemblyBindingConsumption";
+
+    public const string FirmwareConfigurationExecution =
+        "20260730021808_FirmwareConfigurationExecution";
 }

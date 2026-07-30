@@ -366,6 +366,10 @@ public sealed class ProductionOrderLifecycleApiTests(SqlServerFixture server)
                 version = $"FWREQ-{version}",
                 required = true,
                 evidenceReference = "客户批准的固件基线，具体版本待现场确认",
+                operationCode = "FW_CONFIG",
+                configurationPackage = $"CFG-{version}",
+                checksumAlgorithm = "SHA-256",
+                expectedChecksum = $"CHECKSUM-{version}",
             },
         },
             testSpecifications = new[]
