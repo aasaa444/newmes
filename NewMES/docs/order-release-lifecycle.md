@@ -4,7 +4,7 @@ Ticket 05 将 ERP 已接收订单转换为稳定的车间执行依据。下达�
 
 ## 执行模板
 
-工艺工程师通过 `POST /api/process/execution-templates` 发布新版本，需要同时具备 `ProcessDefinitionManage` 与 `TestSpecificationApprove`。模板必须结构化包含：
+工艺工程师通过 `POST /api/process/execution-templates` 发布新版本，需要 `ProcessDefinitionManage`。测试规范由工艺工程师创建草稿、质量工程师以 `TestSpecificationApprove` 独立批准；模板发布者不能代替质量批准，只能引用已经批准且适用于当前产品和路线工序的规范版本。模板必须结构化包含：
 
 - ERP/MES 已启用的成品物料及其来源版本；
 - 单层 BOM 版本、组件、单位用量和各组件追溯粒度；

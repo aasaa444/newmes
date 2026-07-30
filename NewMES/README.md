@@ -66,6 +66,21 @@ Ticket 08 建立了装配绑定与三种粒度实际耗用：
 - 解绑和替换引用原关系与原事务，追加冲正及补偿事件；原关系、事务、事件和永久幂等回执不删除。
 - 工位需求显示待采集、已采集和剩余量；支持成品正查以及按关键件 SN 或 Lot 反查受影响成品。
 
+Ticket 09 建立了固件与配置执行履历：
+
+- 固件版本、配置包、校验算法和期望校验值来自订单冻结快照，不由工位或代码猜测。
+- 每次执行保存要求值与实际值、设备、主体、位置、时间、诊断和原始关联；服务端重新判定结果。
+- 失败与复试分别追加并建立引用，成功事实并发唯一；工序全部必需固件要求通过后才推进路线。
+- 固件执行、制造事件、路线推进和业务审计在同一 SQL Server 事务提交。
+
+Ticket 10 建立了版本化测试规范与逐项测试执行：
+
+- 工艺工程师创建规范草稿，质量工程师独立批准；模板只能冻结已批准且产品/工序适用的版本。
+- 冻结规范包含 Numeric、Text、Boolean 项目的必测条件、单位、精度、包含边界的限值或期望值，完整定义带哈希且批准后由 SQL Server 阻止改写，具体阈值不由系统推断。
+- 操作员逐项提交原始测量、设备、夹具和原始报告引用，MES 按冻结项目服务端判定每项和总体结果。
+- 判定失败或必测项缺失均形成失败事实，复测追加保存并引用最新失败；幂等、并发唯一成功、数据库只追加触发器和事务回滚由真实 SQL Server 验证。
+- 测试工作台与产品谱系返回完整历史，不把失败覆盖成最后一次通过。
+
 ## 工程结构
 
 ```text
@@ -91,4 +106,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；装配实际用料见 [装配绑定与三种粒度物料耗用](docs/assembly-material-consumption.md)；固件证据见 [固件与配置执行履历](docs/firmware-configuration-history.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；装配实际用料见 [装配绑定与三种粒度物料耗用](docs/assembly-material-consumption.md)；固件证据见 [固件与配置执行履历](docs/firmware-configuration-history.md)；测试规范与逐项执行见 [版本化测试规范与逐项测试执行](docs/test-specification-execution.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

@@ -35,4 +35,7 @@ public static class MesMigrationIds
 
     public const string FirmwareConfigurationExecution =
         "20260730021808_FirmwareConfigurationExecution";
+
+    public const string VersionedTestSpecificationAndRuns =
+        "20260730033740_VersionedTestSpecificationAndRuns";
 }

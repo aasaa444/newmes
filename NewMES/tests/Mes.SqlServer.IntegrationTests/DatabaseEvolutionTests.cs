@@ -31,6 +31,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.AuthorizedIdentitySourcesAndReceipts,
         MesMigrationIds.AssemblyBindingConsumption,
         MesMigrationIds.FirmwareConfigurationExecution,
+        MesMigrationIds.VersionedTestSpecificationAndRuns,
     ];
 
     [SqlServerFact]
@@ -50,6 +51,9 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.True(await TableExistsAsync(context, "ProductLabels"));
         Assert.True(await TableExistsAsync(context, "IdentitySourceRegistrations"));
         Assert.True(await TableExistsAsync(context, "StartWipCommandReceipts"));
+        Assert.True(await TableExistsAsync(context, "TestSpecificationVersions"));
+        Assert.True(await TableExistsAsync(context, "TestRuns"));
+        Assert.True(await TableExistsAsync(context, "TestMeasurements"));
     }
 
     [SqlServerFact]

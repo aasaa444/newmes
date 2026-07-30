@@ -6,6 +6,7 @@ using Mes.Domain.Auditing;
 using Mes.Domain.Execution;
 using Mes.Domain.Identity;
 using Mes.Domain.MasterData;
+using Mes.Infrastructure.Execution;
 using Mes.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
@@ -444,15 +445,71 @@ public sealed class ProductionOrderLifecycleApiTests(SqlServerFixture server)
     {
         await using var context = CreateContext(connectionString);
         await context.Database.MigrateAsync();
+        var engineer = Account(
+            "engineer.05",
+            "工艺工程师 05",
+            EngineerPassword,
+            BusinessRole.ProcessEngineer);
+        var quality = Account(
+            "quality.05",
+            "质量工程师 05",
+            "IntegrationOnly-Quality-05!",
+            BusinessRole.QualityEngineer);
+        var finishedMaterial = Material(
+            "ROUTER-FG-01",
+            "工业路由器成品",
+            TraceabilityMode.Serial);
         context.UserAccounts.AddRange(
             Account("planner.05", "计划员 05", PlannerPassword, BusinessRole.Planner),
-            Account("engineer.05", "工艺工程师 05", EngineerPassword, BusinessRole.ProcessEngineer),
+            engineer,
+            quality,
             Account("operator.05", "操作工 05", OperatorPassword, BusinessRole.Operator));
         context.Materials.AddRange(
-            Material("ROUTER-FG-01", "工业路由器成品", TraceabilityMode.Serial),
+            finishedMaterial,
             Material("ROUTER-PCBA-01", "已测 PCBA", TraceabilityMode.Serial),
             Material("ROUTER-ENCLOSURE-01", "路由器外壳", TraceabilityMode.Lot));
+        var items = new TestSpecificationItemDefinition[]
+        {
+            new(
+                "FUNCTION_RESULT",
+                "Function result",
+                "Boolean",
+                true,
+                ExpectedBoolean: true),
+        };
+        var definitionJson = JsonSerializer.Serialize(items, JsonSerializerOptions.Web);
+        var specifications = new[]
+        {
+            DraftSpecification("TEST-1.0"),
+            DraftSpecification("TEST-2.0"),
+        };
+        context.TestSpecificationVersions.AddRange(specifications);
         await context.SaveChangesAsync();
+        foreach (var specification in specifications)
+        {
+            specification.IsApproved = true;
+            specification.ApprovedAtUtc = DateTimeOffset.UtcNow;
+            specification.ApprovedByUserId = quality.Id;
+            specification.ApprovedByUsername = quality.Username;
+            specification.ApprovalEvidenceReference = $"Quality approval for {specification.Version}";
+        }
+
+        await context.SaveChangesAsync();
+
+        TestSpecificationVersion DraftSpecification(string version) => new()
+        {
+            Id = Guid.NewGuid(),
+            Code = "FUNCTION-TEST",
+            Version = version,
+            MaterialId = finishedMaterial.Id,
+            OperationCode = "FUNCTION_TEST",
+            Applicability = "Production-order lifecycle integration fixture",
+            DefinitionJson = definitionJson,
+            DefinitionHash = new string(version == "TEST-1.0" ? 'A' : 'B', 64),
+            DefinitionHashAlgorithm = "SHA-256-JSON-V1",
+            CreatedAtUtc = DateTimeOffset.UtcNow,
+            CreatedByUserId = engineer.Id,
+        };
     }
 
     private static UserAccount Account(

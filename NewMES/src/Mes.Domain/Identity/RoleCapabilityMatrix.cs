@@ -17,7 +17,7 @@ public static class RoleCapabilityMatrix
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.ProcessDefinitionRead,
                 BusinessCapability.ProcessDefinitionManage,
-                BusinessCapability.TestSpecificationApprove),
+                BusinessCapability.TestSpecificationRead),
             [BusinessRole.Operator] = Set(
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.StationExecute,
@@ -34,6 +34,8 @@ public static class RoleCapabilityMatrix
                 BusinessCapability.IdentityContextRead,
                 BusinessCapability.QualityQueueRead,
                 BusinessCapability.GenealogyRead,
+                BusinessCapability.TestSpecificationRead,
+                BusinessCapability.TestSpecificationApprove,
                 BusinessCapability.QualityDispositionApprove,
                 BusinessCapability.QualityHoldRelease),
             [BusinessRole.MaterialHandler] = Set(

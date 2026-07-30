@@ -34,15 +34,6 @@ public sealed class ExecutionTemplateService(
             request.MaterialCode,
             correlationId,
             cancellationToken);
-        await identityAccess.DemandCapabilityAsync(
-            actor,
-            BusinessCapability.TestSpecificationApprove,
-            PublishAction,
-            "ProductExecutionTemplateVersion",
-            request.MaterialCode,
-            correlationId,
-            cancellationToken);
-
         var validationError = Validate(request);
         if (validationError is not null)
         {
@@ -120,6 +111,70 @@ public sealed class ExecutionTemplateService(
                     409);
             }
 
+            var specificationCodes = request.TestSpecifications
+                .Select(item => item.Code)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            var specificationVersions = await context.TestSpecificationVersions
+                .AsNoTracking()
+                .Where(item => specificationCodes.Contains(item.Code))
+                .ToArrayAsync(cancellationToken);
+            var resolvedTestSpecifications = new List<TestSpecificationReferenceDefinition>(
+                request.TestSpecifications.Count);
+            foreach (var reference in request.TestSpecifications)
+            {
+                var specification = specificationVersions.SingleOrDefault(item =>
+                    item.Code == reference.Code && item.Version == reference.Version);
+                if (specification is null || !specification.IsApproved)
+                {
+                    await DenyAsync(
+                        actor,
+                        request.MaterialCode,
+                        "TEST_SPECIFICATION_NOT_APPROVED",
+                        correlationId,
+                        cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    throw new ExecutionTemplateRejectedException(
+                        "TEST_SPECIFICATION_NOT_APPROVED",
+                        $"测试规范 {reference.Code}:{reference.Version} 不存在或尚未批准，不能进入执行模板。",
+                        422);
+                }
+
+                if (specification.MaterialId != material.Id
+                    || !request.Route.Operations.Any(operation =>
+                        operation.Code == specification.OperationCode))
+                {
+                    await DenyAsync(
+                        actor,
+                        request.MaterialCode,
+                        "TEST_SPECIFICATION_NOT_APPLICABLE",
+                        correlationId,
+                        cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                    throw new ExecutionTemplateRejectedException(
+                        "TEST_SPECIFICATION_NOT_APPLICABLE",
+                        $"测试规范 {reference.Code}:{reference.Version} 不适用于该产品或路线工序。",
+                        422);
+                }
+
+                var items = JsonSerializer.Deserialize<TestSpecificationItemDefinition[]>(
+                    specification.DefinitionJson,
+                    JsonSerializerOptions.Web) ?? throw new ExecutionTemplateRejectedException(
+                    "TEST_SPECIFICATION_DEFINITION_INVALID",
+                    $"测试规范 {reference.Code}:{reference.Version} 的定义无法解析，请停止发布。",
+                    500);
+                resolvedTestSpecifications.Add(new TestSpecificationReferenceDefinition(
+                    specification.Code,
+                    specification.Version,
+                    reference.Required,
+                    specification.ApprovalEvidenceReference ?? reference.EvidenceReference,
+                    specification.OperationCode,
+                    material.Code,
+                    specification.DefinitionHash,
+                    specification.DefinitionHashAlgorithm,
+                    items));
+            }
+
             var definition = new ExecutionTemplateDefinition(
                 new ProductDefinition(
                     material.Code,
@@ -140,7 +195,7 @@ public sealed class ExecutionTemplateService(
                 request.TraceabilityPolicy,
                 request.IdentityPolicy,
                 request.FirmwareRequirements,
-                request.TestSpecifications,
+                resolvedTestSpecifications,
                 request.CompletionGate);
             var definitionJson = JsonSerializer.Serialize(definition, JsonSerializerOptions.Web);
             var definitionHash = Convert.ToHexString(
@@ -256,6 +311,8 @@ public sealed class ExecutionTemplateService(
                 string.IsNullOrWhiteSpace(specification.Code)
                 || string.IsNullOrWhiteSpace(specification.Version)
                 || string.IsNullOrWhiteSpace(specification.EvidenceReference))
+            || request.TestSpecifications.Select(specification => specification.Code)
+                .Distinct(StringComparer.Ordinal).Count() != request.TestSpecifications.Count
             || request.CompletionGate!.Requirements.Any(string.IsNullOrWhiteSpace)
             || request.CompletionGate.Requirements.Distinct(StringComparer.Ordinal).Count()
                 != request.CompletionGate.Requirements.Count)

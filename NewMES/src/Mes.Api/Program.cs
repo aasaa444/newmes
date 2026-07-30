@@ -72,6 +72,8 @@ builder.Services.AddScoped<MaterialWorkbenchQueryService>();
 builder.Services.AddScoped<ProductIdentityService>();
 builder.Services.AddScoped<AssemblyMaterialService>();
 builder.Services.AddScoped<FirmwareConfigurationService>();
+builder.Services.AddScoped<TestSpecificationService>();
+builder.Services.AddScoped<TestRunService>();
 builder.Services.AddScoped<IPasswordHasher<UserAccount>, PasswordHasher<UserAccount>>();
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddScoped<JwtTokenIssuer>();
@@ -189,6 +191,8 @@ app.MapMaterialTransactionEndpoints();
 app.MapProductIdentityEndpoints();
 app.MapAssemblyMaterialEndpoints();
 app.MapFirmwareConfigurationEndpoints();
+app.MapTestSpecificationEndpoints();
+app.MapTestRunEndpoints();
 
 app.Run();
 

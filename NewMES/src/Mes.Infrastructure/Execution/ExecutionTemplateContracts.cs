@@ -53,7 +53,12 @@ public sealed record TestSpecificationReferenceDefinition(
     string Code,
     string Version,
     bool Required,
-    string EvidenceReference);
+    string EvidenceReference,
+    string? OperationCode = null,
+    string? MaterialCode = null,
+    string? DefinitionHash = null,
+    string? DefinitionHashAlgorithm = null,
+    IReadOnlyList<TestSpecificationItemDefinition>? Items = null);
 
 public sealed record CompletionGateDefinition(
     string Version,

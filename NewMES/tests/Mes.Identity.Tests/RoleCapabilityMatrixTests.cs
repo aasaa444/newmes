@@ -8,9 +8,12 @@ public sealed class RoleCapabilityMatrixTests
     {
         { BusinessRole.Planner, BusinessCapability.ProductionOrderManage },
         { BusinessRole.ProcessEngineer, BusinessCapability.ProcessDefinitionManage },
+        { BusinessRole.ProcessEngineer, BusinessCapability.TestSpecificationRead },
         { BusinessRole.Operator, BusinessCapability.StationExecute },
         { BusinessRole.LineSupervisor, BusinessCapability.ProductionPauseRequest },
         { BusinessRole.QualityEngineer, BusinessCapability.QualityDispositionApprove },
+        { BusinessRole.QualityEngineer, BusinessCapability.TestSpecificationApprove },
+        { BusinessRole.QualityEngineer, BusinessCapability.TestSpecificationRead },
         { BusinessRole.MaterialHandler, BusinessCapability.MaterialTransactionExecute },
         { BusinessRole.SystemAdministrator, BusinessCapability.AccountManage },
         { BusinessRole.OperationsManager, BusinessCapability.OperationsReportRead },
@@ -31,6 +34,7 @@ public sealed class RoleCapabilityMatrixTests
     [Theory]
     [InlineData(BusinessRole.Planner, BusinessCapability.QualityDispositionApprove)]
     [InlineData(BusinessRole.ProcessEngineer, BusinessCapability.ProductionOrderManage)]
+    [InlineData(BusinessRole.ProcessEngineer, BusinessCapability.TestSpecificationApprove)]
     [InlineData(BusinessRole.Operator, BusinessCapability.QualityDispositionApprove)]
     [InlineData(BusinessRole.LineSupervisor, BusinessCapability.QualityDispositionApprove)]
     [InlineData(BusinessRole.QualityEngineer, BusinessCapability.AccountManage)]

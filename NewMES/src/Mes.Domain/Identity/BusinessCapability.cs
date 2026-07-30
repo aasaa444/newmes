@@ -7,6 +7,7 @@ public enum BusinessCapability
     ProductionOrderManage,
     ProcessDefinitionRead,
     ProcessDefinitionManage,
+    TestSpecificationRead,
     TestSpecificationApprove,
     StationExecute,
     DefectReport,

@@ -52,6 +52,13 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
     public DbSet<FirmwareConfigurationExecution> FirmwareConfigurationExecutions =>
         Set<FirmwareConfigurationExecution>();
 
+    public DbSet<TestSpecificationVersion> TestSpecificationVersions =>
+        Set<TestSpecificationVersion>();
+
+    public DbSet<TestRun> TestRuns => Set<TestRun>();
+
+    public DbSet<TestMeasurement> TestMeasurements => Set<TestMeasurement>();
+
     public DbSet<IdentitySourceRegistration> IdentitySourceRegistrations =>
         Set<IdentitySourceRegistration>();
 
@@ -612,6 +619,160 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne<UserAccount>()
                 .WithMany()
                 .HasForeignKey(execution => execution.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TestSpecificationVersion>(entity =>
+        {
+            entity.ToTable(
+                "TestSpecificationVersions",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_TestSpecificationVersions_ControlledApproval");
+                    table.HasCheckConstraint(
+                        "CK_TestSpecificationVersions_Approval",
+                        "([IsApproved] = 0 AND [ApprovedAtUtc] IS NULL "
+                        + "AND [ApprovedByUserId] IS NULL AND [ApprovedByUsername] IS NULL "
+                        + "AND [ApprovalEvidenceReference] IS NULL) OR "
+                        + "([IsApproved] = 1 AND [ApprovedAtUtc] IS NOT NULL "
+                        + "AND [ApprovedByUserId] IS NOT NULL AND [ApprovedByUsername] IS NOT NULL "
+                        + "AND [ApprovalEvidenceReference] IS NOT NULL)");
+                });
+            entity.HasKey(specification => specification.Id);
+            entity.Property(specification => specification.Code).HasMaxLength(80);
+            entity.Property(specification => specification.Version).HasMaxLength(80);
+            entity.Property(specification => specification.OperationCode).HasMaxLength(80);
+            entity.Property(specification => specification.Applicability).HasMaxLength(400);
+            entity.Property(specification => specification.DefinitionJson).HasColumnType("nvarchar(max)");
+            entity.Property(specification => specification.DefinitionHash).HasMaxLength(64);
+            entity.Property(specification => specification.DefinitionHashAlgorithm).HasMaxLength(24);
+            entity.Property(specification => specification.ApprovedByUsername).HasMaxLength(120);
+            entity.Property(specification => specification.ApprovalEvidenceReference).HasMaxLength(400);
+            entity.HasIndex(specification => new { specification.Code, specification.Version }).IsUnique();
+            entity.HasIndex(specification => new
+            {
+                specification.MaterialId,
+                specification.OperationCode,
+                specification.IsApproved,
+            });
+            entity.HasOne<Material>()
+                .WithMany()
+                .HasForeignKey(specification => specification.MaterialId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(specification => specification.CreatedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(specification => specification.ApprovedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TestRun>(entity =>
+        {
+            entity.ToTable(
+                "TestRuns",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_TestRuns_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_TestRuns_Result",
+                        "[Result] IN ('Succeeded', 'Failed')");
+                    table.HasCheckConstraint(
+                        "CK_TestRuns_Time",
+                        "[EndedAtUtc] >= [StartedAtUtc]");
+                });
+            entity.HasKey(run => run.Id);
+            entity.Property(run => run.SpecificationCode).HasMaxLength(80);
+            entity.Property(run => run.SpecificationVersion).HasMaxLength(80);
+            entity.Property(run => run.SpecificationDefinitionHash).HasMaxLength(64);
+            entity.Property(run => run.OperationCode).HasMaxLength(80);
+            entity.Property(run => run.DeviceId).HasMaxLength(120);
+            entity.Property(run => run.DeviceVersion).HasMaxLength(80);
+            entity.Property(run => run.FixtureId).HasMaxLength(120);
+            entity.Property(run => run.FixtureVersion).HasMaxLength(80);
+            entity.Property(run => run.RawReportReference).HasMaxLength(400);
+            entity.Property(run => run.Result).HasConversion<string>().HasMaxLength(16);
+            entity.Property(run => run.DiagnosticCode).HasMaxLength(80);
+            entity.Property(run => run.DiagnosticMessage).HasMaxLength(1000);
+            entity.Property(run => run.SourceSystem).HasMaxLength(80);
+            entity.Property(run => run.IdempotencyKey).HasMaxLength(120);
+            entity.Property(run => run.CommandHash).HasMaxLength(64);
+            entity.Property(run => run.CommandHashAlgorithm).HasMaxLength(24);
+            entity.Property(run => run.ActorUsername).HasMaxLength(120);
+            entity.Property(run => run.Location).HasMaxLength(120);
+            entity.Property(run => run.CorrelationId).HasMaxLength(64);
+            entity.Property(run => run.NextOperationCodeAfter).HasMaxLength(80);
+            entity.HasIndex(run => new { run.SourceSystem, run.IdempotencyKey }).IsUnique();
+            entity.HasIndex(run => new
+            {
+                run.ProductIdentityId,
+                run.SpecificationCode,
+                run.SpecificationVersion,
+            }).IsUnique().HasFilter("[Result] = 'Succeeded'");
+            entity.HasIndex(run => new { run.ProductIdentityId, run.RecordedAtUtc });
+            entity.HasIndex(run => run.ManufacturingEventId).IsUnique();
+            entity.HasOne(run => run.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(run => run.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrder>()
+                .WithMany()
+                .HasForeignKey(run => run.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<ProductionOrderExecutionSnapshot>()
+                .WithMany()
+                .HasForeignKey(run => run.ExecutionSnapshotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(run => run.RetryOfTestRun)
+                .WithMany()
+                .HasForeignKey(run => run.RetryOfTestRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(run => run.ManufacturingEvent)
+                .WithMany()
+                .HasForeignKey(run => run.ManufacturingEventId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<UserAccount>()
+                .WithMany()
+                .HasForeignKey(run => run.ActorUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<TestMeasurement>(entity =>
+        {
+            entity.ToTable(
+                "TestMeasurements",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_TestMeasurements_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_TestMeasurements_Result",
+                        "[Result] IN ('Passed', 'Failed')");
+                });
+            entity.HasKey(measurement => measurement.Id);
+            entity.Property(measurement => measurement.ItemCode).HasMaxLength(80);
+            entity.Property(measurement => measurement.ItemName).HasMaxLength(200);
+            entity.Property(measurement => measurement.DataType).HasMaxLength(20);
+            entity.Property(measurement => measurement.RawValue).HasMaxLength(1000);
+            entity.Property(measurement => measurement.Unit).HasMaxLength(40);
+            entity.Property(measurement => measurement.LowerLimit).HasPrecision(18, 6);
+            entity.Property(measurement => measurement.UpperLimit).HasPrecision(18, 6);
+            entity.Property(measurement => measurement.NumericValue).HasPrecision(18, 6);
+            entity.Property(measurement => measurement.ExpectedText).HasMaxLength(1000);
+            entity.Property(measurement => measurement.Result).HasConversion<string>().HasMaxLength(16);
+            entity.Property(measurement => measurement.DiagnosticCode).HasMaxLength(80);
+            entity.Property(measurement => measurement.DiagnosticMessage).HasMaxLength(1000);
+            entity.Property(measurement => measurement.ReportedDiagnosticCode).HasMaxLength(80);
+            entity.Property(measurement => measurement.ReportedDiagnosticMessage).HasMaxLength(1000);
+            entity.HasIndex(measurement => new { measurement.TestRunId, measurement.ItemCode })
+                .IsUnique();
+            entity.HasOne(measurement => measurement.TestRun)
+                .WithMany(run => run.Measurements)
+                .HasForeignKey(measurement => measurement.TestRunId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
