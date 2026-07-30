@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证 ERP Inbox 的原始证据、幂等冲突、并发收敛、授权和跨表事务原子性。</summary>
 public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
 {
     private const string PlannerPassword = "IntegrationOnly-Planner-04!";
@@ -413,6 +414,7 @@ public sealed class ProductionOrderIngressApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    // 通过数据库触发器注入保存阶段故障，证明 Inbox、订单和成功审计确实处于同一事务。
     public async Task DatabaseFailureRollsBackInboxOrderAndSuccessAuditTogether()
     {
         var connectionString = await server.CreateDatabaseAsync();

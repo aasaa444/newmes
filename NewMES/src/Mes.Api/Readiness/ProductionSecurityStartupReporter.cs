@@ -2,6 +2,7 @@ using Mes.Infrastructure.Security;
 
 namespace Mes.Api.Readiness;
 
+/// <summary>启动时把生产安全违规写入受保护日志，供部署人员定位而不向匿名健康响应泄密。</summary>
 public sealed partial class ProductionSecurityStartupReporter(
     ProductionSecurityContextProvider contextProvider,
     ILogger<ProductionSecurityStartupReporter> logger) : IHostedService

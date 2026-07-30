@@ -2,6 +2,7 @@ using Mes.Domain.Identity;
 
 namespace Mes.Domain.Auditing;
 
+// 权限与业务命令审计，不等同于制造事件；它记录授权角色、能力和拒绝原因。
 public sealed class BusinessAuditRecord
 {
     public Guid Id { get; init; }

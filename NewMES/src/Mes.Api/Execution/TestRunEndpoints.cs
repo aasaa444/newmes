@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>质量测试执行、工位上下文和产品测试谱系查询端点。</summary>
 public static class TestRunEndpoints
 {
     public static IEndpointRouteBuilder MapTestRunEndpoints(this IEndpointRouteBuilder endpoints)

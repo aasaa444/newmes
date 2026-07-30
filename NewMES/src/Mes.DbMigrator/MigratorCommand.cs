@@ -1,5 +1,6 @@
 namespace Mes.DbMigrator;
 
+// 数据库结构迁移、演示数据和首个管理员初始化是三个显式操作，避免部署脚本误触发额外副作用。
 public enum MigratorOperation
 {
     Migrate,
@@ -7,6 +8,7 @@ public enum MigratorOperation
     BootstrapAdministrator,
 }
 
+/// <summary>严格解析迁移工具参数；未知参数直接失败，生产自动化不能依赖宽松猜测。</summary>
 public sealed record MigratorCommand(
     MigratorOperation Operation,
     bool ConfirmNonProduction,

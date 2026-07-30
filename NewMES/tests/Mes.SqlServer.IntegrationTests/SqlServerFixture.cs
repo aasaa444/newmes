@@ -4,6 +4,10 @@ using Testcontainers.MsSql;
 
 namespace Mes.SqlServer.IntegrationTests;
 
+/// <summary>
+/// 为每个测试创建隔离数据库。可连接指定 SQL Server，也可在发布门禁中启动临时容器，
+/// 从而真实验证事务隔离、触发器、rowversion 和迁移行为。
+/// </summary>
 public sealed class SqlServerFixture : IAsyncLifetime
 {
     private readonly ConcurrentBag<string> _createdDatabases = [];
@@ -81,6 +85,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>创建独立数据库并登记清理清单；测试自行决定迁移到哪个历史版本。</summary>
     public async Task<string> CreateDatabaseAsync()
     {
         var databaseName = $"NewMesTests_{Guid.NewGuid():N}";
@@ -101,6 +106,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
 }
 
 [CollectionDefinition(Name)]
+/// <summary>在同一测试集合内复用 SQL Server 实例，但不复用各测试的业务数据库。</summary>
 public sealed class SqlServerFixtureProvider : ICollectionFixture<SqlServerFixture>
 {
     public const string Name = "sql-server";

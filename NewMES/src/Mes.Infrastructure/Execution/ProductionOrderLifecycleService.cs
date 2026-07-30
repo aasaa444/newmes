@@ -8,6 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 执行生产订单的释放、开工、暂停、恢复和完工命令。
+/// 服务负责权限、状态机、订单快照和审计的一致性，而不是让端点直接修改状态字段。
+/// </summary>
 public sealed class ProductionOrderLifecycleService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -24,6 +28,7 @@ public sealed class ProductionOrderLifecycleService(
     {
         const string action = "PRODUCTION_ORDER_RELEASE";
         await DemandManageAsync(actor, orderId, action, correlationId, cancellationToken);
+        // Serializable 隔离保证并发释放只能生成一份订单快照；重复的同一释放命令返回既有结果。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -91,6 +96,7 @@ public sealed class ProductionOrderLifecycleService(
             }
 
             var now = timeProvider.GetUtcNow();
+            // 释放时冻结当下已批准模板。此后所有工位执行都读取该快照，而不是读取可能已升级的模板。
             var snapshot = new ProductionOrderExecutionSnapshot
             {
                 Id = Guid.NewGuid(),
@@ -127,6 +133,7 @@ public sealed class ProductionOrderLifecycleService(
 
         var action = $"PRODUCTION_ORDER_{ToAction(command)}";
         await DemandManageAsync(actor, orderId, action, correlationId, cancellationToken);
+        // 状态迁移和审计记录属于一个事务，任何一方失败都不能留下“已操作但无证据”的半成品。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

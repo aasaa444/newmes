@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Security;
 
+/// <summary>从容器挂载目录读取外部秘密；键禁止包含路径分隔符，避免目录穿越。</summary>
 public static class ExternalSecretFile
 {
     public static string? ReadOptional(string directory, string key)

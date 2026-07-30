@@ -15,6 +15,10 @@ using System.Globalization;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>
+/// 验证从空库和历史版本升级、约束与触发器、事务回滚、并发版本以及运行账号最小权限。
+/// 这些结论依赖 SQL Server 实际行为，不能由 EF 内存提供程序替代。
+/// </summary>
 public sealed class DatabaseEvolutionTests(SqlServerFixture server)
 {
     private static readonly string[] CurrentMigrationIds =

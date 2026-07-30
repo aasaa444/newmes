@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>测试规范起草、独立批准和版本读取端点。</summary>
 public static class TestSpecificationEndpoints
 {
     public static IEndpointRouteBuilder MapTestSpecificationEndpoints(

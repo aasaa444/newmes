@@ -2,6 +2,7 @@ using Mes.Domain.Identity;
 
 namespace Mes.Domain.Execution;
 
+// 订单下达时冻结的自包含执行依据，确保后续模板变化不会改变在制品应执行的规则。
 public sealed class ProductionOrderExecutionSnapshot
 {
     public Guid Id { get; init; }

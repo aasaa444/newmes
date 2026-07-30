@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Mes.Infrastructure.Security;
 
+/// <summary>从实际宿主环境和配置源构造安全快照，不把读取配置与规则判断混在一起。</summary>
 public sealed class ProductionSecurityContextProvider(
     IConfiguration configuration,
     IHostEnvironment environment,

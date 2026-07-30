@@ -5,6 +5,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.EvolutionBaseline)]
+/// <summary>加入 ERP 来源、并发版本和只追加制造事件，形成可演进数据库的第一条历史证据链。</summary>
 public sealed class EvolutionBaseline : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -67,6 +68,7 @@ public sealed class EvolutionBaseline : Migration
             table: "ManufacturingEvents",
             column: "CorrectsEventId");
 
+        // 数据库级禁止修改和删除，确保非 EF 写入路径也只能追加纠正事件。
         migrationBuilder.Sql("""
             CREATE TRIGGER [mes].[TR_ManufacturingEvents_AppendOnly]
             ON [mes].[ManufacturingEvents]

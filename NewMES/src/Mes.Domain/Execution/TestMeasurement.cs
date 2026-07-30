@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 一次测试运行中的逐项证据，同时冻结判定规则，保证日后仍能解释当时为何通过或失败。
 public sealed class TestMeasurement
 {
     public Guid Id { get; init; }

@@ -13,6 +13,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证冻结固件要求、实际设备证据、失败重试、并发成功唯一性和事务回滚。</summary>
 public sealed class FirmwareConfigurationApiTests(SqlServerFixture server)
 {
     private const string OperatorPassword = "IntegrationOnly-Operator-09!";
@@ -340,6 +341,7 @@ public sealed class FirmwareConfigurationApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    // 在审计写入处注入数据库故障，确保固件结果、制造事件、审计和路线推进不会出现部分提交。
     public async Task DatabaseFailureRollsBackExecutionEventsAuditAndRouteAdvance()
     {
         var setup = await CreateSetupAsync(await server.CreateDatabaseAsync());

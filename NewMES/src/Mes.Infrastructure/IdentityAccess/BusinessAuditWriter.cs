@@ -4,6 +4,7 @@ using Mes.Infrastructure.Persistence;
 
 namespace Mes.Infrastructure.IdentityAccess;
 
+// 审计写入模型刻意保存执行当时的操作者、授权角色和关联号，而不是只保留可变的用户外键。
 internal sealed record BusinessAuditActor(
     Guid? UserId,
     string Username,
@@ -24,6 +25,7 @@ internal sealed record BusinessAuditWrite(
     string? ReasonCode,
     string CorrelationId);
 
+/// <summary>把允许和拒绝的业务动作追加到同一业务事务中，形成不可抵赖的操作证据。</summary>
 internal sealed class BusinessAuditWriter(
     MesDbContext context,
     TimeProvider timeProvider)

@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 不可变制造事实的通用时间线。发生时间与系统记录时间分开，以保留设备延迟上报证据。
 public sealed class ManufacturingEvent
 {
     public Guid Id { get; init; }

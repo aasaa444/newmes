@@ -11,6 +11,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 管理产品序列号等受控标识、身份来源授权、产品开工和标签生命周期。
+/// 服务把“分配标识”和“允许投入生产”分开，防止未经授权或未满足快照规则的身份进入在制品。
+/// </summary>
 public sealed class ProductIdentityService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -62,6 +66,7 @@ public sealed class ProductIdentityService(
 
         var sourceSystem = Normalize(request.SourceSystem);
         var callerUsername = Normalize(request.AuthorizedCallerUsername);
+        // 身份源注册涉及授权范围和号段，使用可重试事务避免并发创建重叠来源。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

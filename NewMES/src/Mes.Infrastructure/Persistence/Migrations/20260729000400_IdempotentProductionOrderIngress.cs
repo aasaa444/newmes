@@ -5,6 +5,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.IdempotentProductionOrderIngress)]
+/// <summary>建立 ERP Inbox、载荷摘要和来源业务键，使订单入站支持幂等重放与内容冲突检测。</summary>
 public sealed class IdempotentProductionOrderIngress : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -14,6 +15,7 @@ public sealed class IdempotentProductionOrderIngress : Migration
             name: "CK_ProductionOrders_Status",
             schema: "mes",
             table: "ProductionOrders");
+        // 旧版 Created 与新入站语义中的 Received 等价，先回填再收紧状态约束可保证无损升级。
         migrationBuilder.Sql("""
             UPDATE [mes].[ProductionOrders]
             SET [Status] = N'Received'

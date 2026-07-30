@@ -5,6 +5,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.CapabilityRolesAuditContext)]
+/// <summary>引入能力角色、密码凭据和只追加业务审计，为职责分离与可证明授权奠定基础。</summary>
 public sealed class CapabilityRolesAuditContext : Migration
 {
     private const string Roles =
@@ -152,6 +153,7 @@ public sealed class CapabilityRolesAuditContext : Migration
                     onDelete: ReferentialAction.Cascade);
             });
 
+        // 审计是业务证据而非普通日志，数据库拒绝任何事后改写或删除。
         migrationBuilder.Sql("""
             CREATE TRIGGER [audit].[TR_BusinessAuditRecords_AppendOnly]
             ON [audit].[BusinessAuditRecords]

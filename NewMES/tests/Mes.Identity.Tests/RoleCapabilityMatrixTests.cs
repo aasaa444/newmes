@@ -2,6 +2,7 @@ using Mes.Domain.Identity;
 
 namespace Mes.Identity.Tests;
 
+/// <summary>锁定角色到业务能力的职责分离矩阵，防止后续改动无意扩大岗位权限。</summary>
 public sealed class RoleCapabilityMatrixTests
 {
     public static TheoryData<BusinessRole, BusinessCapability> CoreRoleCapabilities => new()

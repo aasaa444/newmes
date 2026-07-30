@@ -1,5 +1,6 @@
 namespace Mes.Domain.Integration;
 
+// 同一消息标识收到不同载荷时追加的冲突证据，不覆盖第一次已经确认的收件结果。
 public sealed class IntegrationInboxConflict
 {
     public Guid Id { get; init; }

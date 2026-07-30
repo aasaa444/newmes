@@ -2,6 +2,7 @@ using Mes.Infrastructure.Security;
 
 namespace Mes.Security.Tests;
 
+/// <summary>以纯规则测试锁定生产部署安全基线的允许与拒绝条件。</summary>
 public sealed class ProductionSecurityBaselineTests
 {
     [Fact]

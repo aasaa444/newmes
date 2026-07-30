@@ -6,6 +6,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Seeding;
 
+/// <summary>
+/// 显式装载可重复执行的非生产演示数据。固定标识便于测试和演示，但此初始化器绝不由生产 API 自动调用。
+/// </summary>
 public sealed class DemoDataInitializer(MesDbContext context)
 {
     private static readonly Guid DemoUserId =
@@ -27,8 +30,7 @@ public sealed class DemoDataInitializer(MesDbContext context)
         var strategy = context.Database.CreateExecutionStrategy();
         await strategy.ExecuteAsync(async () =>
         {
-            // This initializer owns its context in the migrator process. Clearing before a
-            // retry prevents entities tracked by a failed attempt from being added twice.
+            // 初始化器独占迁移进程中的上下文；重试前清空跟踪，避免失败尝试留下的实体被重复添加。
             context.ChangeTracker.Clear();
             await using var transaction =
                 await context.Database.BeginTransactionAsync(cancellationToken);

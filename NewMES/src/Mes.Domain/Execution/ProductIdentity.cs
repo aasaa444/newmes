@@ -2,6 +2,7 @@ using Mes.Domain.MasterData;
 
 namespace Mes.Domain.Execution;
 
+// 一台成品的唯一身份与当前执行位置，连接订单快照、制造事件和完整产品谱系。
 public sealed class ProductIdentity
 {
     public Guid Id { get; init; }

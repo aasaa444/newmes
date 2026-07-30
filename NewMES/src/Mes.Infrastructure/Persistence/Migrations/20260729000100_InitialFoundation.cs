@@ -5,6 +5,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.InitialFoundation)]
+/// <summary>建立安全与 MES 基础架构，以及用户、物料和生产订单的最小关系模型。</summary>
 public sealed class InitialFoundation : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)

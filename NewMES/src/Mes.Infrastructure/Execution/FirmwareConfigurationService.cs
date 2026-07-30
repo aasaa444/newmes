@@ -11,6 +11,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 记录固件下载/配置执行结果，并将实际版本、配置摘要和设备证据纳入产品谱系。
+/// 执行规则来自订单释放快照，避免模板升级影响在制品。
+/// </summary>
 public sealed class FirmwareConfigurationService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -40,6 +44,7 @@ public sealed class FirmwareConfigurationService(
         try
         {
             var command = Parse(request, serialNumber);
+            // 回执提供幂等语义：相同命令可安全重试，不同内容复用同一键则按冲突拒绝。
             var strategy = context.Database.CreateExecutionStrategy();
             return await strategy.ExecuteAsync(async () =>
             {

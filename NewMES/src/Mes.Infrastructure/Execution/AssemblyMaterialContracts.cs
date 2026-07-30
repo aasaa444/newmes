@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 本文件定义装配投料、解绑、替换、冲正和正反向追溯查询的应用层契约。
 public sealed record AssemblyMaterialConsumeRequest(
     string? SourceSystem,
     string? IdempotencyKey,

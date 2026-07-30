@@ -13,6 +13,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 处理产品与批次/序列化组件的装配关系和物料消耗事实，并提供正向谱系与反向影响分析。
+/// 已确认事实不原地改写；纠错通过解绑、替换或冲正记录表达，保留完整追溯链。
+/// </summary>
 public sealed class AssemblyMaterialService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -62,6 +66,7 @@ public sealed class AssemblyMaterialService(
         try
         {
             var command = Parse(request, serialNumber);
+            // 消耗、装配关系、命令回执和审计必须原子提交；Serializable 同时防止重复绑定和超量消耗。
             var strategy = context.Database.CreateExecutionStrategy();
             return await strategy.ExecuteAsync(async () =>
             {

@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>装配投料、纠错及物料谱系端点；业务校验和事务仍由应用服务统一负责。</summary>
 public static class AssemblyMaterialEndpoints
 {
     public static IEndpointRouteBuilder MapAssemblyMaterialEndpoints(

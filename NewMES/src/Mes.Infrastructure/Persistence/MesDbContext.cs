@@ -8,6 +8,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Persistence;
 
+/// <summary>
+/// NewMES 的关系模型边界。应用层规则在服务中执行，关键不变量同时下沉为 SQL Server 约束、唯一索引和触发器，
+/// 以防批处理、运维脚本或未来新增入口绕过应用代码后破坏审计与追溯证据。
+/// </summary>
 public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbContext(options)
 {
     public DbSet<UserAccount> UserAccounts => Set<UserAccount>();
@@ -67,6 +71,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // 身份与审计：角色采用受控枚举，审计表只追加，并保存动作发生时的角色快照。
         modelBuilder.Entity<UserAccount>(entity =>
         {
             entity.ToTable(
@@ -154,6 +159,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 物料主数据和事务账：交易事实只追加，余额变化方向由交易类型约束，冲正只能一对一引用原交易。
         modelBuilder.Entity<Material>(entity =>
         {
             entity.ToTable(
@@ -231,6 +237,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 transaction.SourceSystem,
                 transaction.IdempotencyKey,
             }).IsUnique();
+            // 过滤唯一索引允许普通交易为空，但确保一笔原交易最多只能被冲正一次。
             entity.HasIndex(transaction => transaction.ReversesTransactionId)
                 .IsUnique()
                 .HasFilter("[ReversesTransactionId] IS NOT NULL");
@@ -276,6 +283,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 订单与执行快照：ERP 来源具有业务唯一性；释放后冻结的模板快照和模板版本本身都不可改写。
         modelBuilder.Entity<ProductionOrder>(entity =>
         {
             entity.ToTable(
@@ -362,6 +370,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 产品身份与装配：只约束“当前有效”标识和绑定，历史失效记录仍保留用于完整谱系回放。
         modelBuilder.Entity<ProductIdentity>(entity =>
         {
             entity.ToTable(
@@ -474,6 +483,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasIndex(binding => binding.ComponentSerialNumber)
                 .IsUnique()
                 .HasFilter("[IsActive] = 1");
+            // 同一受控组件在任一时刻只能有一个有效父产品，解绑后的历史记录不阻止合法重装。
             entity.HasIndex(binding => new
             {
                 binding.ProductIdentityId,
@@ -546,6 +556,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 固件和测试执行均保存实际执行证据；成功回执有条件唯一，失败后允许以新运行进行受控重试。
         modelBuilder.Entity<FirmwareConfigurationExecution>(entity =>
         {
             entity.ToTable(
@@ -873,6 +884,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
+        // 集成 Inbox 保存每次收到的原始证据和冲突，不以更新订单的结果替代接口接收历史。
         modelBuilder.Entity<IntegrationInboxMessage>(entity =>
         {
             entity.ToTable(
@@ -944,6 +956,7 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // 制造事件作为时间线事实只追加，供跨模块重建产品和订单的执行经过。
         modelBuilder.Entity<ManufacturingEvent>(entity =>
         {
             entity.ToTable(

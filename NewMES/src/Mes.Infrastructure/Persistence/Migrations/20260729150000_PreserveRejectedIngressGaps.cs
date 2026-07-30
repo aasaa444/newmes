@@ -5,6 +5,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.PreserveRejectedIngressGaps)]
+/// <summary>允许拒绝消息保留缺失字段，并标记旧摘要算法，避免验证失败反而丢失原始接口证据。</summary>
 public sealed class PreserveRejectedIngressGaps : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -39,6 +40,7 @@ public sealed class PreserveRejectedIngressGaps : Migration
             oldClrType: typeof(string),
             oldType: "nvarchar(32)",
             oldMaxLength: 32);
+        // 旧成功消息没有原始 JSON，不能冒充完整载荷摘要；显式标记旧算法以保持证据含义诚实。
         migrationBuilder.Sql("""
             UPDATE [integration].[IntegrationInboxMessages]
             SET [PayloadHashAlgorithm] = N'SHA-256-DTO-V1'
@@ -54,6 +56,7 @@ public sealed class PreserveRejectedIngressGaps : Migration
 
     protected override void Down(MigrationBuilder migrationBuilder)
     {
+        // 只有不存在字段缺口时才允许降级，防止把无法表示的拒绝证据静默截断。
         migrationBuilder.Sql("""
             IF EXISTS (
                 SELECT 1

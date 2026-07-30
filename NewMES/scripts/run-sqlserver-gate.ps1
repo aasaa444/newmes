@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param()
 
+# The release gate must exercise real SQL Server behavior. Without an external connection, the fixture may use Docker.
 if ([string]::IsNullOrWhiteSpace($env:NEWMES_SQLSERVER_TEST_CONNECTION)) {
     $ErrorActionPreference = 'SilentlyContinue'
     docker info *> $null
@@ -11,6 +12,7 @@ if ([string]::IsNullOrWhiteSpace($env:NEWMES_SQLSERVER_TEST_CONNECTION)) {
     }
 }
 
+# Enable the explicit gate only for this process, then restore the caller's environment in finally.
 $previousGateValue = $env:NEWMES_RUN_SQLSERVER_TESTS
 $env:NEWMES_RUN_SQLSERVER_TESTS = 'true'
 

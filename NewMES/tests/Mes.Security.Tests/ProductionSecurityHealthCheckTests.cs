@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Mes.Security.Tests;
 
+/// <summary>验证安全违规和数据库高权限会阻断 readiness，而开发模式不会伪装成生产检查。</summary>
 public sealed class ProductionSecurityHealthCheckTests
 {
     [Fact]

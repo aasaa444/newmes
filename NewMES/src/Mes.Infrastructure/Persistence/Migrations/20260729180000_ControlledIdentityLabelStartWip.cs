@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>引入产品身份、受控标识、标签和开工回执，并把制造事件关联到产品与订单快照。</summary>
     public partial class ControlledIdentityLabelStartWip : Migration
     {
         /// <inheritdoc />
@@ -62,6 +62,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 type: "datetimeoffset",
                 nullable: true);
 
+            // 历史事件早于身份模型，只能依据当时存在的聚合标识回填；无法证明的关联保持为空。
             migrationBuilder.Sql("""
                 DISABLE TRIGGER [mes].[TR_ManufacturingEvents_AppendOnly]
                 ON [mes].[ManufacturingEvents];

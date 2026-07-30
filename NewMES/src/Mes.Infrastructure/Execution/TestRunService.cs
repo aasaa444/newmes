@@ -12,6 +12,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 按订单快照中的已批准规范评估逐项测量并保存一次不可变测试运行。
+/// 失败后的复测创建新运行并关联前次结果，不覆盖原失败证据。
+/// </summary>
 public sealed class TestRunService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -42,6 +46,7 @@ public sealed class TestRunService(
         try
         {
             var command = Parse(request, serialNumber);
+            // 测量、总体判定、复测关系、命令回执和审计作为一个事实包原子提交。
             var strategy = context.Database.CreateExecutionStrategy();
             return await strategy.ExecuteAsync(async () =>
             {

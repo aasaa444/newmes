@@ -5,6 +5,7 @@ using Mes.Infrastructure.Integration;
 
 namespace Mes.Api.Integration;
 
+/// <summary>ERP 生产订单入站和 MES 订单工作台查询端点。</summary>
 public static class ProductionOrderEndpoints
 {
     public static IEndpointRouteBuilder MapProductionOrderEndpoints(

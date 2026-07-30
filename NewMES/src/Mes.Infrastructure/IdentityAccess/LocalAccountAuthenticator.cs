@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.IdentityAccess;
 
+/// <summary>验证本地账号密码并返回请求期身份；停用账号即使密码正确也不能建立会话。</summary>
 public sealed class LocalAccountAuthenticator(
     MesDbContext context,
     IPasswordHasher<UserAccount> passwordHasher,

@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 本文件定义固件配置执行、工位展示和产品谱系查询契约；版本和摘要用于证明实际烧录内容。
 public sealed record FirmwareExecutionRequest(
     string? SourceSystem,
     string? IdempotencyKey,

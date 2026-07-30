@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证序列/批次装配、快照用量、并发唯一绑定、补偿式纠错及正反向谱系。</summary>
 public sealed class AssemblyMaterialApiTests(SqlServerFixture server)
 {
     private const string HandlerPassword = "IntegrationOnly-Handler-08!";

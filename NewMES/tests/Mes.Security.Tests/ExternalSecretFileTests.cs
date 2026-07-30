@@ -2,6 +2,7 @@ using Mes.Infrastructure.Security;
 
 namespace Mes.Security.Tests;
 
+/// <summary>验证外部秘密读取不会接受目录穿越，也不会把空文件当成有效秘密。</summary>
 public sealed class ExternalSecretFileTests : IDisposable
 {
     private readonly string _directory = Path.Combine(

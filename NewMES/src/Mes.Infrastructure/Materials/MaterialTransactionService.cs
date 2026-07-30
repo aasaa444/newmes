@@ -14,6 +14,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Materials;
 
+/// <summary>
+/// 以只追加事务账记录线边库存和订单可用量变化。
+/// 当前余额由事实增量推导，错误通过反向事务冲正，不允许修改原始交易。
+/// </summary>
 public sealed class MaterialTransactionService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -168,6 +172,7 @@ public sealed class MaterialTransactionService(
         var sourceSystem = Normalize(request.SourceSystem);
         var idempotencyKey = Normalize(request.IdempotencyKey);
         var commandHash = Hash(new { originalTransactionId, request });
+        // Serializable 隔离把余额校验与新事实写入放在同一临界区，防止并发请求导致负库存。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

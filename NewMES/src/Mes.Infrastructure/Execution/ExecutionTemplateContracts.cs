@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 本文件定义工艺执行模板的发布契约。模板把产品、BOM、工艺路线、追溯、固件和测试要求汇总为可版本化的执行依据。
 public sealed record ExecutionTemplatePublishRequest(
     string MaterialCode,
     string ProductVersion,

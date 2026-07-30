@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>固件工位执行、工位上下文和产品固件谱系查询端点。</summary>
 public static class FirmwareConfigurationEndpoints
 {
     public static IEndpointRouteBuilder MapFirmwareConfigurationEndpoints(

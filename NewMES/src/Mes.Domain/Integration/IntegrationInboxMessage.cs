@@ -2,6 +2,7 @@ using Mes.Domain.Execution;
 
 namespace Mes.Domain.Integration;
 
+// ERP 入站收件箱事实。原始载荷、哈希和首次处理结果共同构成幂等重放依据。
 public sealed class IntegrationInboxMessage
 {
     public Guid Id { get; init; }

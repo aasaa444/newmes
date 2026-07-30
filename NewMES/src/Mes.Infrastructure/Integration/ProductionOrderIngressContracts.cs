@@ -2,6 +2,7 @@ using System.Text.Json.Serialization;
 
 namespace Mes.Infrastructure.Integration;
 
+// ERP 入站契约同时保留业务载荷和来源版本，用于区分安全重放、内容冲突与合法的新版本。
 public sealed record ProductionOrderIngressRequest(
     string SourceSystem,
     string MessageId,

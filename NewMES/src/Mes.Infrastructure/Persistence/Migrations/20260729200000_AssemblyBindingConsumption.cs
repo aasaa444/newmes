@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>加入装配绑定、组件级消耗和命令回执，使批次/序列件能够参与产品正反向追溯。</summary>
     public partial class AssemblyBindingConsumption : Migration
     {
         /// <inheritdoc />
@@ -246,6 +246,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 principalColumn: "Id",
                 onDelete: ReferentialAction.Restrict);
 
+            // 扩展既有物料触发器，在保留非负余额和冲正规则的同时支持装配消耗形态。
             migrationBuilder.Sql("""
                 CREATE OR ALTER TRIGGER [mes].[TR_MaterialTransactions_ValidateInsert]
                 ON [mes].[MaterialTransactions]
@@ -330,6 +331,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 END;
                 """);
 
+            // 装配回执固定同一幂等键的业务结论，禁止事后改写。
             migrationBuilder.Sql("""
                 CREATE TRIGGER [mes].[TR_AssemblyCommandReceipts_AppendOnly]
                 ON [mes].[AssemblyCommandReceipts]

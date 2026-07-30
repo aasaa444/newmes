@@ -5,6 +5,7 @@ using Mes.Infrastructure.Materials;
 
 namespace Mes.Api.Materials;
 
+/// <summary>线边库存交易命令及物料工作台查询端点。</summary>
 public static class MaterialTransactionEndpoints
 {
     public static IEndpointRouteBuilder MapMaterialTransactionEndpoints(

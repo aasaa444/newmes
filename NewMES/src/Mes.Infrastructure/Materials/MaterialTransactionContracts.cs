@@ -2,6 +2,7 @@ using Mes.Domain.Materials;
 
 namespace Mes.Infrastructure.Materials;
 
+// 物料契约用离散命令表达线边转移、发料、退料、调整和冲正，调用方不能直接提交余额。
 public sealed record LineSideTransferRequest(
     string? ContractVersion,
     string? SourceSystem,

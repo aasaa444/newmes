@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Persistence;
 
+/// <summary>集中声明受支持的迁移边界，供迁移工具、兼容性检查和升级测试引用。</summary>
 public static class MesMigrationIds
 {
     public const string InitialFoundation = "20260729000100_InitialFoundation";

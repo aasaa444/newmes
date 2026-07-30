@@ -12,6 +12,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>端到端证明登录后的角色与能力来自数据库当前状态，而不是仅信任令牌声明。</summary>
 public sealed class IdentityApiTests(SqlServerFixture server)
 {
     [SqlServerFact]

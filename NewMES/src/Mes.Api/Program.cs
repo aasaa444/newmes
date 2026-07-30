@@ -22,6 +22,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.IdentityModel.Tokens;
 
+// API 只读取配置并检查数据库兼容性；建库、迁移和首个管理员初始化由独立 DbMigrator 执行。
 var builder = WebApplication.CreateBuilder(args);
 var secretsDirectory = Environment.GetEnvironmentVariable("MES_SECRETS_DIRECTORY")
     ?? "/run/secrets";
@@ -51,6 +52,7 @@ if (string.IsNullOrWhiteSpace(signingKey) || signingKey.Length < 32)
         "Security:JwtSigningKey with at least 32 characters is required.");
 }
 
+// 业务服务均为请求作用域，共享同一 DbContext，确保业务事实与审计能够加入同一事务。
 builder.Services.AddDbContext<MesDbContext>(options =>
     options.UseSqlServer(connectionString, sql => sql.EnableRetryOnFailure()));
 builder.Services.AddScoped<DatabaseCompatibilityChecker>();
@@ -135,6 +137,7 @@ if (effectiveCorsOrigins.Length > 0)
 
 var app = builder.Build();
 
+// 先恢复反向代理提供的协议和来源信息，再执行 HTTPS、安全身份和 CORS 判断。
 app.UseForwardedHeaders();
 if (app.Environment.IsProduction())
 {
@@ -142,6 +145,7 @@ if (app.Environment.IsProduction())
     app.UseHttpsRedirection();
 }
 
+// 顺序不可随意调整：先建立关联号和认证，再刷新数据库身份，最后执行能力授权与端点逻辑。
 app.UseMiddleware<CorrelationIdMiddleware>();
 app.UseAuthentication();
 app.UseMiddleware<CurrentIdentityMiddleware>();
@@ -151,6 +155,7 @@ if (effectiveCorsOrigins.Length > 0)
     app.UseCors("ConfiguredOrigins");
 }
 
+// liveness 只表示进程存活；readiness 还要求数据库版本和生产安全基线满足要求。
 app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = registration => registration.Tags.Contains("live"),
@@ -183,6 +188,7 @@ app.MapGet("/api/system/info", (CorrelationContextAccessor correlation) =>
         status = "running",
         correlationId = correlation.CorrelationId,
     }));
+// 每个端点组只负责 HTTP 映射，MES 规则集中在 Infrastructure 服务中，避免多入口行为不一致。
 app.MapIdentityEndpoints();
 app.MapProductionOrderEndpoints(app.Environment.IsDevelopment());
 app.MapExecutionTemplateEndpoints();

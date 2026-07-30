@@ -3,6 +3,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Identity;
 
+/// <summary>登录、当前身份、角色管理、账号停用和审计查询端点。</summary>
 public static class IdentityEndpoints
 {
     public static IEndpointRouteBuilder MapIdentityEndpoints(this IEndpointRouteBuilder endpoints)

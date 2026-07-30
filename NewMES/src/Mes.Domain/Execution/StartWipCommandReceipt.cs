@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// START_WIP 命令的永久幂等回执，使设备重试不会重复投产或重复增加订单数量。
 public sealed class StartWipCommandReceipt
 {
     public Guid Id { get; init; }

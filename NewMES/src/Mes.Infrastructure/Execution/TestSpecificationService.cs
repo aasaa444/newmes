@@ -11,6 +11,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 管理版本化测试规范的起草、批准和读取。
+/// 已批准规范不可覆盖，模板只能引用明确版本，从而支持质量职责分离和历史复现。
+/// </summary>
 public sealed class TestSpecificationService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -37,6 +41,7 @@ public sealed class TestSpecificationService(
             correlationId,
             cancellationToken);
         var parsed = ParseDraft(request);
+        // 版本唯一性和草稿落库在 Serializable 事务内完成，防止两个并发请求创建同一版本。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

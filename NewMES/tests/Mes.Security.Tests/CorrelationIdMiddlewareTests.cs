@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Mes.Security.Tests;
 
+/// <summary>验证关联号的生成、回显、长度限制和日志作用域传播。</summary>
 public sealed class CorrelationIdMiddlewareTests
 {
     [Fact]

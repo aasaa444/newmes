@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Persistence;
 
+// 兼容性结果区分数据库不可用、应用落后和数据库落后，便于 readiness 给出可执行的部署诊断。
 public sealed record DatabaseCompatibility(
     bool IsReady,
     string Code,
@@ -11,6 +12,7 @@ public sealed record DatabaseCompatibility(
     IReadOnlyList<string> UnknownMigrations,
     Exception? Error = null);
 
+/// <summary>只检查架构兼容性，不在 API 进程中自动迁移数据库。</summary>
 public sealed class DatabaseCompatibilityChecker(MesDbContext context)
 {
     public async Task<DatabaseCompatibility> CheckAsync(

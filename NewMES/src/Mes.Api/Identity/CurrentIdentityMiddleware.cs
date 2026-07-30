@@ -3,6 +3,9 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Identity;
 
+/// <summary>
+/// 在 JWT 验证后加载数据库中的当前账号状态和角色，避免长期令牌继续使用已经撤销的权限。
+/// </summary>
 public sealed class CurrentIdentityMiddleware(RequestDelegate next)
 {
     public async Task InvokeAsync(

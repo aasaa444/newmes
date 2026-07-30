@@ -5,6 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# Accept only the production HTTPS entry point so the smoke test cannot bypass the reverse proxy.
 if ($BaseUri.Scheme -ne 'https') {
     throw 'Production smoke tests require an HTTPS BaseUri.'
 }
@@ -12,6 +13,7 @@ if ($BaseUri.Scheme -ne 'https') {
 function Invoke-NewMesGet {
     param([string]$Path)
 
+    # Correlation ID echoing proves the deployment preserved the proxy-to-API observability path.
     $correlationId = 'deployment-smoke-' + [Guid]::NewGuid().ToString('N')
     $response = Invoke-WebRequest `
         -Uri ([Uri]::new($BaseUri, $Path)) `
@@ -26,6 +28,7 @@ function Invoke-NewMesGet {
     return $response
 }
 
+# Verify process liveness, business readiness, and the minimal application response independently.
 $live = Invoke-NewMesGet '/health/live'
 $ready = Invoke-NewMesGet '/health/ready'
 $systemInfo = Invoke-NewMesGet '/api/system/info'

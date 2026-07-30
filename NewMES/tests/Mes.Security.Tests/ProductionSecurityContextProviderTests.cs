@@ -5,6 +5,7 @@ using Microsoft.Extensions.Hosting;
 
 namespace Mes.Security.Tests;
 
+/// <summary>验证宿主配置与文件型秘密被准确投影为生产安全检查上下文。</summary>
 public sealed class ProductionSecurityContextProviderTests : IDisposable
 {
     private readonly string _directory = Path.Combine(

@@ -2,6 +2,7 @@ using Mes.Infrastructure.Persistence;
 
 namespace Mes.Api.Readiness;
 
+/// <summary>启动时记录数据库兼容性结论，但不在 API 进程内自动执行迁移。</summary>
 public sealed partial class DatabaseCompatibilityStartupReporter(
     IServiceScopeFactory scopeFactory,
     ILogger<DatabaseCompatibilityStartupReporter> logger) : IHostedService

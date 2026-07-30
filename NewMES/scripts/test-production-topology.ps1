@@ -3,6 +3,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 $composePath = Join-Path $PSScriptRoot '..\deploy\compose.production.yml'
+# Use disposable placeholder secrets to render the topology without starting services or reading production secrets.
 $temporaryDirectory = Join-Path ([IO.Path]::GetTempPath()) ("newmes-topology-" + [Guid]::NewGuid().ToString('N'))
 $secretFileEnvironment = @{
     NEWMES_APP_CONNECTION_FILE = (Join-Path $temporaryDirectory 'app-connection')
@@ -45,6 +46,7 @@ try {
         Set-Content -LiteralPath $entry.Value -Value 'topology-check-only' -NoNewline
     }
 
+    # Let Compose resolve variables and mounts before asserting against the effective configuration.
     $configurationJson = docker compose --file $composePath --profile operations config --format json
     if ($LASTEXITCODE -ne 0) {
         throw "Docker Compose configuration failed with exit code $LASTEXITCODE."
@@ -52,6 +54,7 @@ try {
 
     $configuration = $configurationJson | ConvertFrom-Json
     $services = $configuration.services
+    # Only the TLS proxy is public; the API, database, and migrator must remain on the internal network.
     Assert-Topology ($null -ne $services.proxy.ports) 'The reverse proxy must publish HTTPS.'
     Assert-Topology ($services.proxy.ports.Count -eq 1) 'Only one proxy port may be published.'
     Assert-Topology ($services.proxy.ports[0].target -eq 443) 'The proxy must publish container port 443.'
@@ -63,6 +66,7 @@ try {
     Assert-Topology ($services.api.environment.Security__ExternalHttpsOnly -eq 'true') 'External HTTPS must be required.'
     Assert-Topology ($services.api.environment.Security__DemoInitializationEnabled -eq 'false') 'Demo initialization must be disabled.'
     Assert-Topology ($services.api.environment.Security__SecretsSource -eq 'ExternalFiles') 'Secrets must come from external files.'
+    # Sensitive values must use file-backed secret mounts and stay out of the rendered environment.
     Assert-Topology ($null -eq $services.api.environment.ConnectionStrings__MesDatabase) 'The API connection string must not be an environment value.'
     Assert-Topology ($null -eq $services.api.environment.Security__JwtSigningKey) 'The signing key must not be an environment value.'
     Assert-Topology ($null -eq $services.sqlserver.environment.MSSQL_SA_PASSWORD) 'The SQL administrator password must not be an environment value.'

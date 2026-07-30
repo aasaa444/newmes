@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 版本化测试规范。只能从草稿受控批准一次，批准后的定义和证据由数据库阻止改写。
 public sealed class TestSpecificationVersion
 {
     public Guid Id { get; init; }

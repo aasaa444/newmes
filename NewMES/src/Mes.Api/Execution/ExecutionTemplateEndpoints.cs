@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>工艺工程师发布版本化产品执行模板的管理端点。</summary>
 public static class ExecutionTemplateEndpoints
 {
     public static IEndpointRouteBuilder MapExecutionTemplateEndpoints(

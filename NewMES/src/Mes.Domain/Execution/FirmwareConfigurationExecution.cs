@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 一次固件或配置尝试的完整证据，要求值、实际值、设备诊断和 MES 诊断分别保存。
 public sealed class FirmwareConfigurationExecution
 {
     public Guid Id { get; init; }

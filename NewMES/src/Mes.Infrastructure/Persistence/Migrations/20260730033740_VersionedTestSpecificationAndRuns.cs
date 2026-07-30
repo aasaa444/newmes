@@ -5,7 +5,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 引入版本化测试规范、逐项测量和测试运行；规范只允许草稿到批准的一次转换，运行结果只追加。
+    /// </summary>
     public partial class VersionedTestSpecificationAndRuns : Migration
     {
         /// <inheritdoc />
@@ -269,6 +271,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 table: "TestSpecificationVersions",
                 columns: ["MaterialId", "OperationCode", "IsApproved"]);
 
+            // 受控批准触发器允许插入草稿和一次性批准，拒绝覆盖定义、撤销批准或删除历史版本。
             migrationBuilder.Sql(
                 """
                 CREATE TRIGGER [mes].[TR_TestSpecificationVersions_ControlledApproval]
@@ -353,6 +356,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 END
                 """);
 
+            // 测试运行与逐项测量共同构成原始质量证据，复测只能创建关联的新运行。
             migrationBuilder.Sql(
                 """
                 CREATE TRIGGER [mes].[TR_TestRuns_AppendOnly]

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 
 namespace Mes.Api.Readiness;
 
+/// <summary>在生产模式下核验配置安全基线和数据库最小权限，任一违规都会关闭 readiness。</summary>
 public sealed partial class ProductionSecurityHealthCheck(
     ProductionSecurityContextProvider contextProvider,
     IRuntimeDatabasePrivilegeProbe privilegeProbe,

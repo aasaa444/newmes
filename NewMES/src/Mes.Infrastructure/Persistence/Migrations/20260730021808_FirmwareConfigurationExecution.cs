@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>记录固件/配置实际执行版本、摘要、设备证据、重试关系和成功命令唯一性。</summary>
     public partial class FirmwareConfigurationExecution : Migration
     {
         /// <inheritdoc />
@@ -154,6 +154,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 columns: ["SourceSystem", "IdempotencyKey"],
                 unique: true);
 
+            // 固件执行是产品谱系事实；失败也必须保留，后续重试通过新行关联而不是覆盖。
             migrationBuilder.Sql("""
                 CREATE TRIGGER [mes].[TR_FirmwareConfigurationExecutions_AppendOnly]
                 ON [mes].[FirmwareConfigurationExecutions]

@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 本文件定义测试执行输入、逐项测量结果、工位视图和谱系视图，不承载状态变更逻辑。
 public sealed record TestRunRequest(
     string? SourceSystem,
     string? IdempotencyKey,

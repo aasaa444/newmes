@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 装配命令的只追加幂等回执，保存原命令哈希和首次业务结果。
 public sealed class AssemblyCommandReceipt
 {
     public Guid Id { get; init; }

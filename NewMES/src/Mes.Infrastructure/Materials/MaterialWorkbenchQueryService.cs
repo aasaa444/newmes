@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Materials;
 
+/// <summary>从只追加物料账汇总线边量、订单量和交易明细，供工作台核对而非直接修正余额。</summary>
 public sealed class MaterialWorkbenchQueryService(
     MesDbContext context,
     IdentityAccessService identityAccess)

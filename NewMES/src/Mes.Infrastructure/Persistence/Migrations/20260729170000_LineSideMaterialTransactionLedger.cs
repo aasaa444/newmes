@@ -7,6 +7,7 @@ namespace Mes.Infrastructure.Persistence.Migrations;
 
 [DbContext(typeof(MesDbContext))]
 [Migration(MesMigrationIds.LineSideMaterialTransactionLedger)]
+/// <summary>建立只追加物料事务账、冲正关系和数据库级非负余额校验。</summary>
 public partial class LineSideMaterialTransactionLedger : Migration
 {
     protected override void Up(MigrationBuilder migrationBuilder)
@@ -199,6 +200,7 @@ public partial class LineSideMaterialTransactionLedger : Migration
             columns: ["SourceSystem", "IdempotencyKey"],
             unique: true);
 
+        // 事务账禁止更新和删除；盘点差异、退料与错误交易分别用调整、退料或冲正表达。
         migrationBuilder.Sql("""
             CREATE TRIGGER [mes].[TR_MaterialTransactions_AppendOnly]
             ON [mes].[MaterialTransactions]
@@ -209,6 +211,7 @@ public partial class LineSideMaterialTransactionLedger : Migration
                 THROW 51009, 'Material transactions are append-only; use a return, reversal, or adjustment.', 1;
             END;
             """);
+        // 插入触发器在同一数据库事务内核验精确冲正和累计余额，覆盖所有写入入口。
         migrationBuilder.Sql("""
             CREATE TRIGGER [mes].[TR_MaterialTransactions_ValidateInsert]
             ON [mes].[MaterialTransactions]

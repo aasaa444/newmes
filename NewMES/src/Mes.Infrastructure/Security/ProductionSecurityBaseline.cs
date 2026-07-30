@@ -2,6 +2,7 @@ using System.Data.Common;
 
 namespace Mes.Infrastructure.Security;
 
+// 安全上下文是对部署配置的纯数据快照，使启动检查、健康检查和单元测试复用同一判断逻辑。
 public sealed record ProductionSecurityContext(
     string RuntimeEnvironment,
     string DeploymentMode,
@@ -19,6 +20,9 @@ public sealed record ProductionSecurityResult(
     bool IsReady,
     IReadOnlyList<SecurityViolation> Violations);
 
+/// <summary>
+/// 对生产部署执行失败关闭的安全基线检查：外部 HTTPS、外部秘密、强签名密钥、受限 CORS 和非管理员数据库账号。
+/// </summary>
 public static class ProductionSecurityBaseline
 {
     private static readonly string[] SampleKeyMarkers =

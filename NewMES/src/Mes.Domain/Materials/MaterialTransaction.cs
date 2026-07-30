@@ -4,6 +4,7 @@ using Mes.Domain.MasterData;
 
 namespace Mes.Domain.Materials;
 
+// 一笔不可变的物料责任账流水。余额由流水汇总得到，而不是维护一个可被覆盖的库存数字。
 public sealed class MaterialTransaction
 {
     public Guid Id { get; init; }

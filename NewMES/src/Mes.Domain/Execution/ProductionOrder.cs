@@ -2,6 +2,7 @@ using Mes.Domain.MasterData;
 
 namespace Mes.Domain.Execution;
 
+// ERP 计划在 MES 中的执行载体，保存计划数量以及由真实制造事实累计的执行数量。
 public sealed class ProductionOrder
 {
     public Guid Id { get; init; }

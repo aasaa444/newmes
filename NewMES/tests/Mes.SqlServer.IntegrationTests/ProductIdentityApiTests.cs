@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证受控身份来源、计划数量并发门禁、快照标识规则、标签纠错和开工幂等。</summary>
 public sealed class ProductIdentityApiTests(SqlServerFixture server)
 {
     private const string AdministratorPassword = "IntegrationOnly-Administrator-07!";

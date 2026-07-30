@@ -1,5 +1,6 @@
 namespace Mes.Domain.Execution;
 
+// 一台成品的一次测试执行事实；失败与复测均永久保留，并引用所用冻结规范和原失败。
 public sealed class TestRun
 {
     public Guid Id { get; init; }

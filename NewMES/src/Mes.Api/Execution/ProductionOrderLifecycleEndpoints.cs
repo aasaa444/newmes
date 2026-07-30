@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>生产订单受控状态命令和释放快照读取端点；不提供任意状态更新接口。</summary>
 public static class ProductionOrderLifecycleEndpoints
 {
     public static IEndpointRouteBuilder MapProductionOrderLifecycleEndpoints(

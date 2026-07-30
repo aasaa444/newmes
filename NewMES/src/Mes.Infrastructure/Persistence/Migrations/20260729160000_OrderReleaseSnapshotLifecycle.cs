@@ -6,7 +6,9 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// 引入受控订单生命周期和不可变执行快照，使订单释放时冻结 BOM、路线、追溯及工位规则。
+    /// </summary>
     [DbContext(typeof(MesDbContext))]
     [Migration(MesMigrationIds.OrderReleaseSnapshotLifecycle)]
     public partial class OrderReleaseSnapshotLifecycle : Migration
@@ -214,6 +216,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 table: "ProductionOrderExecutionSnapshots",
                 column: "SourceTemplateId");
 
+            // 模板和订单快照只能发布新版本，不能修改历史版本或已释放订单的执行依据。
             migrationBuilder.Sql("""
                 CREATE TRIGGER [mes].[TR_ProductExecutionTemplateVersions_AppendOnly]
                 ON [mes].[ProductExecutionTemplateVersions]

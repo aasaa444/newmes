@@ -3,6 +3,7 @@ using Mes.Domain.MasterData;
 
 namespace Mes.Domain.Execution;
 
+// 工艺发布的版本化执行模板；新版本不会改写已经下达订单所使用的旧版本。
 public sealed class ProductExecutionTemplateVersion
 {
     public Guid Id { get; init; }

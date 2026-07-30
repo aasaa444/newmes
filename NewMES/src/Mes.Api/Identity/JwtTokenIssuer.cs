@@ -6,6 +6,9 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace Mes.Api.Identity;
 
+/// <summary>
+/// 签发短期 JWT 作为认证凭据；最终授权仍以每次请求从数据库读取的有效身份为准。
+/// </summary>
 public sealed class JwtTokenIssuer(IConfiguration configuration, TimeProvider timeProvider)
 {
     public string Issue(EffectiveIdentity identity)

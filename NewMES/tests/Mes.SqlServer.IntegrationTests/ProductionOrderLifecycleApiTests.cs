@@ -17,6 +17,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证订单快照权威、状态迁移门禁、并发释放收敛及跨系统关闭条件。</summary>
 public sealed class ProductionOrderLifecycleApiTests(SqlServerFixture server)
 {
     private const string PlannerPassword = "IntegrationOnly-Planner-05!";

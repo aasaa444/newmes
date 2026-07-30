@@ -18,6 +18,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证线边物料只追加账、幂等、并发防超发、精确冲正与故障回滚。</summary>
 public sealed class MaterialTransactionApiTests(SqlServerFixture server)
 {
     private const string HandlerPassword = "IntegrationOnly-Handler-06!";
@@ -120,6 +121,7 @@ public sealed class MaterialTransactionApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    // 两个请求分别看似合法但合计超量，用真实并发证明 Serializable 和数据库约束不会产生负库存。
     public async Task ConcurrentIssuesCannotOverdrawOneLineSideLot()
     {
         var setup = await CreateSetupAsync(await server.CreateDatabaseAsync());
@@ -159,6 +161,7 @@ public sealed class MaterialTransactionApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    // 故障注入验证交易事实和审计同生共灭，同时直接 SQL 更新验证数据库层仍然禁止改写历史。
     public async Task ReturnReversalAdjustmentAndDatabaseFailureRemainAppendOnlyAndAtomic()
     {
         var setup = await CreateSetupAsync(await server.CreateDatabaseAsync());

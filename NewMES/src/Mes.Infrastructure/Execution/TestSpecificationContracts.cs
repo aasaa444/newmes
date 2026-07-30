@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 测试规范契约区分草稿定义与批准动作，确保制订者不能用一次请求绕过审批证据。
 public sealed record TestSpecificationDraftRequest(
     string? Code,
     string? Version,

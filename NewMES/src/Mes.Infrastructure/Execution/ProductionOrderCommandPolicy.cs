@@ -2,6 +2,7 @@ using Mes.Domain.Execution;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>集中定义生产订单允许的状态迁移，供命令服务和测试共享同一套生命周期规则。</summary>
 public static class ProductionOrderCommandPolicy
 {
     public static IReadOnlyList<string> AvailableCommands(

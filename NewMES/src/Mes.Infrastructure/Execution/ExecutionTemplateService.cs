@@ -12,6 +12,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
 
+/// <summary>
+/// 发布不可变的产品执行模板。生产订单释放后会复制模板内容形成订单快照，
+/// 因此后续修改工艺定义不会悄悄改变已经下达订单的执行规则。
+/// </summary>
 public sealed class ExecutionTemplateService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -41,6 +45,7 @@ public sealed class ExecutionTemplateService(
             throw validationError;
         }
 
+        // 发布必须同时完成版本唯一性校验、模板落库和业务审计；可重试策略的每次尝试都创建全新的事务。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {
@@ -175,6 +180,7 @@ public sealed class ExecutionTemplateService(
                     items));
             }
 
+            // 先将所有跨主数据引用解析成一份自包含定义，再计算摘要，避免日后读取“当前主数据”重建历史事实。
             var definition = new ExecutionTemplateDefinition(
                 new ProductDefinition(
                     material.Code,

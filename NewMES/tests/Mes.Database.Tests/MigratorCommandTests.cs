@@ -2,6 +2,7 @@ using Mes.DbMigrator;
 
 namespace Mes.Database.Tests;
 
+/// <summary>证明迁移器只接受无歧义的受控命令，危险或不完整参数会失败关闭。</summary>
 public sealed class MigratorCommandTests
 {
     [Theory]

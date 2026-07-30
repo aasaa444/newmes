@@ -1,5 +1,6 @@
 namespace Mes.Domain.MasterData;
 
+// MES 使用的物料主数据投影；编码和基础单位来自权威主数据，不能由车间执行过程猜测。
 public sealed class Material
 {
     public Guid Id { get; init; }

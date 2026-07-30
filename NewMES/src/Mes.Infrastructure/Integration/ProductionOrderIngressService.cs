@@ -12,6 +12,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Integration;
 
+/// <summary>
+/// 接收 ERP 生产订单并维护入站证据、幂等回放和版本演进。
+/// 原始消息即使被拒绝也必须留存，使接口争议能够回溯到实际收到的载荷。
+/// </summary>
 public sealed class ProductionOrderIngressService(
     MesDbContext context,
     IdentityAccessService identityAccess,
@@ -84,6 +88,7 @@ public sealed class ProductionOrderIngressService(
         }
 
         var payloadHash = ComputePayloadHash(payloadJson);
+        // 以来源系统和消息键串行化处理；同键同内容返回原结果，同键异内容登记冲突并拒绝覆盖。
         var strategy = context.Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
         {

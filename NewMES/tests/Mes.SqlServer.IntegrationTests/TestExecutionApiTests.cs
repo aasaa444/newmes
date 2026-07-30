@@ -15,6 +15,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Mes.SqlServer.IntegrationTests;
 
 [Collection(SqlServerFixtureProvider.Name)]
+/// <summary>验证规范职责分离、快照项目判定、失败复测、逐项证据、并发和只追加保护。</summary>
 public sealed class TestExecutionApiTests(SqlServerFixture server)
 {
     private const string EngineerPassword = "IntegrationOnly-Engineer-10!";
@@ -411,6 +412,7 @@ public sealed class TestExecutionApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
+    // 在事务末端注入失败，证明测试运行、测量、事件和路线状态构成不可拆分的事实包。
     public async Task DatabaseFailureRollsBackRunMeasurementsEventsAndRouteAdvance()
     {
         var setup = await CreateExecutionSetupAsync(await server.CreateDatabaseAsync());

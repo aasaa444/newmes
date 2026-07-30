@@ -7,6 +7,9 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.IdentityAccess;
 
+/// <summary>
+/// 仅由独立数据库迁移工具显式创建首位管理员，避免 API 启动时悄悄产生默认高权限账号。
+/// </summary>
 public sealed class InitialAdministratorBootstrapper(
     MesDbContext context,
     IPasswordHasher<UserAccount> passwordHasher,

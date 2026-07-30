@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 订单生命周期契约只暴露受控命令，不允许调用方直接提交目标状态，从接口层避免越级跳转。
 public enum ProductionOrderCommand
 {
     Release,

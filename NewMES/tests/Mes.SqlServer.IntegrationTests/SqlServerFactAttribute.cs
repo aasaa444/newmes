@@ -1,6 +1,7 @@
 namespace Mes.SqlServer.IntegrationTests;
 
 [AttributeUsage(AttributeTargets.Method)]
+/// <summary>只有显式打开真实 SQL Server 门禁时才运行集成事实，避免普通单元测试误报数据库证据。</summary>
 public sealed class SqlServerFactAttribute : FactAttribute
 {
     public SqlServerFactAttribute()

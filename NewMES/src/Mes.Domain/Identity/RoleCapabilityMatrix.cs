@@ -4,6 +4,7 @@ public sealed record CapabilityGrant(
     bool IsGranted,
     BusinessRole? GrantedByRole);
 
+// 集中维护岗位到能力的静态基线，并返回实际授权该动作的角色用于审计。
 public static class RoleCapabilityMatrix
 {
     private static readonly Dictionary<BusinessRole, HashSet<BusinessCapability>>

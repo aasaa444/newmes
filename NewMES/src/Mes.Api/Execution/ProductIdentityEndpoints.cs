@@ -4,6 +4,7 @@ using Mes.Infrastructure.IdentityAccess;
 
 namespace Mes.Api.Execution;
 
+/// <summary>受控身份源、序列号分配、开工和标签生命周期端点。</summary>
 public static class ProductIdentityEndpoints
 {
     public static IEndpointRouteBuilder MapProductIdentityEndpoints(

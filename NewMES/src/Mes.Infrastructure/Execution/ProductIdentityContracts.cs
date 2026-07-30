@@ -1,5 +1,6 @@
 namespace Mes.Infrastructure.Execution;
 
+// 本文件定义受控身份源、产品身份分配、开工和标签全生命周期的应用层契约。
 public sealed record ControlledIdentifierRequest(
     string Type,
     string Value,

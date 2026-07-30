@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Integration;
 
+/// <summary>为订单工作台组合业务订单与入站处理证据；查询模型不参与订单状态变更。</summary>
 public sealed class ProductionOrderWorkbenchQueryService(
     MesDbContext context,
     IdentityAccessService identityAccess)

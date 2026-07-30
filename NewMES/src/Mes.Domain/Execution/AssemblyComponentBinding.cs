@@ -4,6 +4,7 @@ using Mes.Domain.MasterData;
 
 namespace Mes.Domain.Execution;
 
+// 成品与序列件或批次件的实际装配关系，并关联对应耗用流水和制造事件。
 public sealed class AssemblyComponentBinding
 {
     public Guid Id { get; init; }

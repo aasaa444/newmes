@@ -5,6 +5,10 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.IdentityAccess;
 
+/// <summary>
+/// 统一执行账号状态、角色分配、能力检查和安全审计。
+/// 业务服务只声明所需能力，避免各模块自行解释角色而导致授权规则漂移。
+/// </summary>
 public sealed class IdentityAccessService(
     MesDbContext context,
     TimeProvider timeProvider)

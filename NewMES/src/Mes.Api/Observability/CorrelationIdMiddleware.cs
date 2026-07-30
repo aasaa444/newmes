@@ -2,6 +2,7 @@ using System.Diagnostics;
 
 namespace Mes.Api.Observability;
 
+/// <summary>接收或生成受长度限制的关联号，并把它同时写入响应头、日志作用域和请求上下文。</summary>
 public sealed partial class CorrelationIdMiddleware(
     RequestDelegate next,
     ILogger<CorrelationIdMiddleware> logger)

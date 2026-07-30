@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 namespace Mes.Infrastructure.Persistence.Migrations
 {
-    /// <inheritdoc />
+    /// <summary>登记获授权的身份来源、号段授权和只追加命令回执，阻止任意调用方自行生成产品身份。</summary>
     public partial class AuthorizedIdentitySourcesAndReceipts : Migration
     {
         /// <inheritdoc />
@@ -144,6 +144,7 @@ namespace Mes.Infrastructure.Persistence.Migrations
                 columns: ["SourceSystem", "IdempotencyKey"],
                 unique: true);
 
+            // 成功或失败回执都是幂等证据，更新会改变重放结论，因此统一只允许追加。
             migrationBuilder.Sql("""
                 CREATE TRIGGER [mes].[TR_StartWipCommandReceipts_AppendOnly]
                 ON [mes].[StartWipCommandReceipts]
