@@ -8,6 +8,7 @@ using Mes.Domain.Execution;
 using Mes.Domain.Identity;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Persistence;
+using Mes.Infrastructure.Quality;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
@@ -26,6 +27,7 @@ public sealed class TestRunService(
     private const decimal MaximumStoredNumeric = 999999999999.999999m;
     private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
     private readonly BusinessAuditWriter auditWriter = new(context, timeProvider);
+    private readonly QualityHoldRecorder qualityHoldRecorder = new(context, timeProvider);
 
     public async Task<TestRunView> ExecuteAsync(
         EffectiveIdentity actor,
@@ -82,6 +84,14 @@ public sealed class TestRunService(
                     .SingleOrDefaultAsync(item => item.SerialNumber == serialNumber, cancellationToken)
                     ?? throw Rejected("PRODUCT_IDENTITY_NOT_FOUND", "未找到成品 SN，请核对扫码内容和身份分配记录。", 404);
                 EnsureExecutable(identity);
+                if (await QualityHoldGuard.IsActiveAsync(context, identity.Id, cancellationToken))
+                {
+                    // 幂等回放在此门禁之前返回；任何新测试（包括未授权复测）都必须等待正式质量处置。
+                    throw Rejected(
+                        "QUALITY_HOLD_ACTIVE",
+                        "该成品处于质量保留，必须完成授权处置后才能继续测试或复测。",
+                        409);
+                }
 
                 var definition = DeserializeDefinition(identity.ExecutionSnapshot!.DefinitionJson);
                 var specification = definition.TestSpecifications.SingleOrDefault(item =>
@@ -259,6 +269,16 @@ public sealed class TestRunService(
                 }
 
                 context.TestRuns.Add(run);
+                if (run.Result == TestRunResult.Failed)
+                {
+                    // 测试失败、不合格、保留、订单计数和审计必须随同一次测试事务原子落库。
+                    await qualityHoldRecorder.RecordTestFailureAsync(
+                        identity,
+                        run,
+                        actor,
+                        correlationId,
+                        cancellationToken);
+                }
                 AppendAudit(actor, ExecuteAction, identity.Id.ToString(), BusinessAuditResult.Succeeded, null, correlationId);
                 await context.SaveChangesAsync(cancellationToken);
                 await transaction.CommitAsync(cancellationToken);

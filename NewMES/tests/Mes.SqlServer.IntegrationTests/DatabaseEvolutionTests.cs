@@ -36,6 +36,7 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         MesMigrationIds.AssemblyBindingConsumption,
         MesMigrationIds.FirmwareConfigurationExecution,
         MesMigrationIds.VersionedTestSpecificationAndRuns,
+        MesMigrationIds.NonconformanceQualityHold,
     ];
 
     [SqlServerFact]
@@ -58,6 +59,8 @@ public sealed class DatabaseEvolutionTests(SqlServerFixture server)
         Assert.True(await TableExistsAsync(context, "TestSpecificationVersions"));
         Assert.True(await TableExistsAsync(context, "TestRuns"));
         Assert.True(await TableExistsAsync(context, "TestMeasurements"));
+        Assert.True(await TableExistsAsync(context, "NonconformanceRecords"));
+        Assert.True(await TableExistsAsync(context, "QualityHolds"));
     }
 
     [SqlServerFact]

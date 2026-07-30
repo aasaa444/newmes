@@ -309,44 +309,50 @@ public sealed class TestExecutionApiTests(SqlServerFixture server)
     }
 
     [SqlServerFact]
-    public async Task FailedRunIsRetainedAndSuccessfulRetryReferencesLatestFailure()
+    public async Task FailedRunCreatesQualityHoldAndBlocksUncontrolledRetry()
     {
         var setup = await CreateExecutionSetupAsync(await server.CreateDatabaseAsync());
         await using var factory = CreateFactory(setup.ConnectionString);
         using var station = factory.CreateClient();
+        using var quality = factory.CreateClient();
         await LoginAsync(station, "operator.10", OperatorPassword);
+        await LoginAsync(quality, "quality.10", QualityPassword);
 
-        var failedResponse = await ExecuteRunAsync(
-            station,
-            setup.FinishedSerialNumber,
-            "TEST-RUN-FAILED",
-            numericValue: "11.39");
+        var failedResponse = await station.PostAsJsonAsync(
+            $"/api/execution/tests/{setup.FinishedSerialNumber}/runs",
+            RunRequest(
+                "TEST-RUN-FAILED",
+                Measurements("11.39", ethernetValue: "false")));
         Assert.Equal(201, (int)failedResponse.StatusCode);
         var failed = await failedResponse.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("Failed", failed.GetProperty("result").GetString());
         Assert.False(failed.GetProperty("operationCompleted").GetBoolean());
+        Assert.Equal(
+            2,
+            failed.GetProperty("measurements").EnumerateArray().Count(item =>
+                item.GetProperty("result").GetString() == "Failed"));
         var failedRunId = failed.GetProperty("testRunId").GetGuid();
 
-        var unlinkedRetry = await ExecuteRunAsync(
-            station,
-            setup.FinishedSerialNumber,
-            "TEST-RUN-UNLINKED");
-        Assert.Equal(409, (int)unlinkedRetry.StatusCode);
-        Assert.Equal("TEST_RETRY_REFERENCE_REQUIRED", await ErrorCodeAsync(unlinkedRetry));
+        // 测试失败不只是一个工位结果，还必须在质量工作台形成正式不合格和独立保留。
+        var qualityQueue = await quality.GetAsync(
+            $"/api/quality/nonconformances?finishedSerialNumber={setup.FinishedSerialNumber}");
+        qualityQueue.EnsureSuccessStatusCode();
+        var queue = await qualityQueue.Content.ReadFromJsonAsync<JsonElement>();
+        var nonconformance = Assert.Single(queue.GetProperty("items").EnumerateArray());
+        Assert.Equal(failedRunId, nonconformance.GetProperty("relatedTestRunId").GetGuid());
+        Assert.Equal("Active", nonconformance.GetProperty("holdStatus").GetString());
 
-        var retryResponse = await ExecuteRunAsync(
+        var blockedRetry = await ExecuteRunAsync(
             station,
             setup.FinishedSerialNumber,
             "TEST-RUN-RETRY",
             retryOfTestRunId: failedRunId);
-        Assert.Equal(201, (int)retryResponse.StatusCode);
-        var retry = await retryResponse.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("Succeeded", retry.GetProperty("result").GetString());
-        Assert.Equal(failedRunId, retry.GetProperty("retryOfTestRunId").GetGuid());
+        Assert.Equal(409, (int)blockedRetry.StatusCode);
+        Assert.Equal("QUALITY_HOLD_ACTIVE", await ErrorCodeAsync(blockedRetry));
 
         var genealogy = await station.GetFromJsonAsync<JsonElement>(
             $"/api/genealogy/products/{setup.FinishedSerialNumber}/tests");
-        Assert.Equal(2, genealogy.GetProperty("runs").GetArrayLength());
+        Assert.Single(genealogy.GetProperty("runs").EnumerateArray());
         Assert.Contains(
             genealogy.GetProperty("runs").EnumerateArray(),
             run => run.GetProperty("testRunId").GetGuid() == failedRunId
@@ -525,11 +531,14 @@ public sealed class TestExecutionApiTests(SqlServerFixture server)
             measurements,
         };
 
-    private static object[] Measurements(string numericValue, string numericUnit = "V") =>
+    private static object[] Measurements(
+        string numericValue,
+        string numericUnit = "V",
+        string ethernetValue = "true") =>
     [
         new { itemCode = "DC_INPUT_VOLTAGE", rawValue = numericValue, unit = numericUnit },
         new { itemCode = "BOOT_STATUS", rawValue = "READY", unit = (string?)null },
-        new { itemCode = "ETHERNET_LINK", rawValue = "true", unit = (string?)null },
+        new { itemCode = "ETHERNET_LINK", rawValue = ethernetValue, unit = (string?)null },
     ];
 
     private static async Task<string?> ErrorCodeAsync(HttpResponseMessage response) =>

@@ -81,6 +81,14 @@ Ticket 10 建立了版本化测试规范与逐项测试执行：
 - 判定失败或必测项缺失均形成失败事实，复测追加保存并引用最新失败；幂等、并发唯一成功、数据库只追加触发器和事务回滚由真实 SQL Server 验证。
 - 测试工作台与产品谱系返回完整历史，不把失败覆盖成最后一次通过。
 
+Ticket 11 建立了不合格记录与独立质量保留：
+
+- 测试失败自动形成不合格和产品保留；操作工也可报告当前工序异常，但不能处置或解除保留。
+- 同一产品可关联多个不合格，但任一时刻只存在一个有效保留，订单保留计数按产品而非缺陷条数累计。
+- 有效保留阻止装配、固件、测试和制造执行完成，拒绝操作不留下部分制造事实。
+- 质量工作台仅向授权岗位展示 SN、订单、工序、测试、证据和保留条件；处置闭环留给 Ticket 12。
+- 来源业务键幂等、制造事件因果链、成功/拒绝审计、数据库只追加保护和整体事务回滚均由真实 SQL Server 验证。
+
 ## 工程结构
 
 ```text
@@ -106,4 +114,4 @@ dotnet test Mes.slnx -c Release
 .\scripts\run-sqlserver-gate.ps1
 ```
 
-数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；装配实际用料见 [装配绑定与三种粒度物料耗用](docs/assembly-material-consumption.md)；固件证据见 [固件与配置执行履历](docs/firmware-configuration-history.md)；测试规范与逐项执行见 [版本化测试规范与逐项测试执行](docs/test-specification-execution.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。
+数据库安装、升级、初始化和回退步骤见 [数据库运维](docs/database-operations.md)；身份和审计契约见 [身份、能力与业务审计](docs/identity-access-audit.md)；ERP 入站见 [ERP 生产订单幂等入站](docs/erp-production-order-ingress.md)；订单下达与生命周期见 [生产订单下达与生命周期](docs/order-release-lifecycle.md)；物料责任账见 [线边物料交接与工单发料事务账](docs/material-transaction-ledger.md)；产品身份与投产见 [受控产品身份、标签与 START_WIP](docs/product-identity-start-wip.md)；装配实际用料见 [装配绑定与三种粒度物料耗用](docs/assembly-material-consumption.md)；固件证据见 [固件与配置执行履历](docs/firmware-configuration-history.md)；测试规范与逐项执行见 [版本化测试规范与逐项测试执行](docs/test-specification-execution.md)；不合格与隔离见 [不合格记录与质量保留](docs/nonconformance-quality-hold.md)；生产账号、秘密、日志、备份恢复和故障处置见 [安全与运维手册](docs/security-operations.md)。

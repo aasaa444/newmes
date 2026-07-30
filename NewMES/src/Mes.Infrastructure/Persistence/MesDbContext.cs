@@ -4,6 +4,7 @@ using Mes.Domain.Identity;
 using Mes.Domain.Integration;
 using Mes.Domain.Materials;
 using Mes.Domain.MasterData;
+using Mes.Domain.Quality;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Persistence;
@@ -68,6 +69,10 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
 
     public DbSet<IdentitySourceIdentifierGrant> IdentitySourceIdentifierGrants =>
         Set<IdentitySourceIdentifierGrant>();
+
+    public DbSet<NonconformanceRecord> NonconformanceRecords => Set<NonconformanceRecord>();
+
+    public DbSet<QualityHold> QualityHolds => Set<QualityHold>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -953,6 +958,108 @@ public sealed class MesDbContext(DbContextOptions<MesDbContext> options) : DbCon
             entity.HasOne(conflict => conflict.InboxMessage)
                 .WithMany()
                 .HasForeignKey(conflict => conflict.InboxMessageId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // 质量事实与保留状态分开建模；同一产品可以有多个不合格，但任一时刻最多一个有效保留。
+        modelBuilder.Entity<QualityHold>(entity =>
+        {
+            entity.ToTable(
+                "QualityHolds",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_QualityHolds_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_QualityHolds_Status",
+                        "[Status] IN ('Active', 'Released')");
+                });
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(16);
+            entity.Property(item => item.StartReasonCode).HasMaxLength(80);
+            entity.Property(item => item.StartReason).HasMaxLength(400);
+            entity.Property(item => item.ReleaseCondition).HasMaxLength(600);
+            entity.Property(item => item.StartedByUsername).HasMaxLength(120);
+            entity.Property(item => item.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(item => item.ProductIdentityId)
+                .IsUnique()
+                .HasFilter("[Status] = 'Active'");
+            entity.HasOne(item => item.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(item => item.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ProductionOrder)
+                .WithMany()
+                .HasForeignKey(item => item.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.StartedByUser)
+                .WithMany()
+                .HasForeignKey(item => item.StartedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ManufacturingEvent)
+                .WithMany()
+                .HasForeignKey(item => item.ManufacturingEventId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<NonconformanceRecord>(entity =>
+        {
+            entity.ToTable(
+                "NonconformanceRecords",
+                "mes",
+                table =>
+                {
+                    table.HasTrigger("TR_NonconformanceRecords_AppendOnly");
+                    table.HasCheckConstraint(
+                        "CK_NonconformanceRecords_Status",
+                        "[Status] IN ('Open', 'Dispositioned')");
+                });
+            entity.HasKey(item => item.Id);
+            entity.Property(item => item.ReferenceNumber).HasMaxLength(64);
+            entity.Property(item => item.Status).HasConversion<string>().HasMaxLength(24);
+            entity.Property(item => item.DetectedOperationCode).HasMaxLength(80);
+            entity.Property(item => item.DefectCode).HasMaxLength(80);
+            entity.Property(item => item.Phenomenon).HasMaxLength(1000);
+            entity.Property(item => item.EvidenceReference).HasMaxLength(400);
+            entity.Property(item => item.SourceSystem).HasMaxLength(80);
+            entity.Property(item => item.IdempotencyKey).HasMaxLength(120);
+            entity.Property(item => item.CommandHash).HasMaxLength(64);
+            entity.Property(item => item.CommandHashAlgorithm).HasMaxLength(24);
+            entity.Property(item => item.ReportedByUsername).HasMaxLength(120);
+            entity.Property(item => item.Location).HasMaxLength(120);
+            entity.Property(item => item.CorrelationId).HasMaxLength(64);
+            entity.HasIndex(item => item.ReferenceNumber).IsUnique();
+            entity.HasIndex(item => new { item.SourceSystem, item.IdempotencyKey }).IsUnique();
+            entity.HasIndex(item => item.RelatedTestRunId)
+                .IsUnique()
+                .HasFilter("[RelatedTestRunId] IS NOT NULL");
+            entity.HasOne(item => item.ProductIdentity)
+                .WithMany()
+                .HasForeignKey(item => item.ProductIdentityId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ProductionOrder)
+                .WithMany()
+                .HasForeignKey(item => item.ProductionOrderId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ExecutionSnapshot)
+                .WithMany()
+                .HasForeignKey(item => item.ExecutionSnapshotId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.QualityHold)
+                .WithMany(item => item.Nonconformances)
+                .HasForeignKey(item => item.QualityHoldId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.RelatedTestRun)
+                .WithMany()
+                .HasForeignKey(item => item.RelatedTestRunId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ReportedByUser)
+                .WithMany()
+                .HasForeignKey(item => item.ReportedByUserId)
+                .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.ManufacturingEvent)
+                .WithMany()
+                .HasForeignKey(item => item.ManufacturingEventId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

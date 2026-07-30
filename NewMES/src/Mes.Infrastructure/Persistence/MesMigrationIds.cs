@@ -39,4 +39,7 @@ public static class MesMigrationIds
 
     public const string VersionedTestSpecificationAndRuns =
         "20260730033740_VersionedTestSpecificationAndRuns";
+
+    public const string NonconformanceQualityHold =
+        "20260730111047_NonconformanceQualityHold";
 }

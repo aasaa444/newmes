@@ -7,6 +7,7 @@ using Mes.Domain.Execution;
 using Mes.Domain.Identity;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Persistence;
+using Mes.Infrastructure.Quality;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
@@ -95,6 +96,15 @@ public sealed class FirmwareConfigurationService(
                     throw Rejected(
                         "FIRMWARE_ORDER_STATUS_BLOCKED",
                         "生产订单当前不是执行中状态，不能记录固件配置。",
+                        409);
+                }
+
+                if (await QualityHoldGuard.IsActiveAsync(context, identity.Id, cancellationToken))
+                {
+                    // 幂等回放已在前面返回；保留生效后仅拒绝新的固件执行事实。
+                    throw Rejected(
+                        "QUALITY_HOLD_ACTIVE",
+                        "该成品处于质量保留，不能继续固件配置。",
                         409);
                 }
 

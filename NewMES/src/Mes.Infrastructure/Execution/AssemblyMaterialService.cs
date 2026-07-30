@@ -9,6 +9,7 @@ using Mes.Domain.Materials;
 using Mes.Domain.MasterData;
 using Mes.Infrastructure.IdentityAccess;
 using Mes.Infrastructure.Persistence;
+using Mes.Infrastructure.Quality;
 using Microsoft.EntityFrameworkCore;
 
 namespace Mes.Infrastructure.Execution;
@@ -128,6 +129,15 @@ public sealed class AssemblyMaterialService(
                     throw Rejected(
                         "ASSEMBLY_ORDER_STATUS_BLOCKED",
                         "生产订单当前不是执行中状态；暂停或终态订单不能继续装配。",
+                        409);
+                }
+
+                if (await QualityHoldGuard.IsActiveAsync(context, identity.Id, cancellationToken))
+                {
+                    // 质量保留冻结正常投料和过站；后续处置只能由 Ticket 12 的受控命令恢复。
+                    throw Rejected(
+                        "QUALITY_HOLD_ACTIVE",
+                        "该成品处于质量保留，不能继续装配投料。",
                         409);
                 }
 
