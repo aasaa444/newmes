@@ -1,10 +1,11 @@
-# 无名 MES（单厂试点 · 第一期）
+# 工业路由器装配 MES（单厂试点候选）
 
-离散电子组装车间制造执行系统骨架。领域词汇见 [`CONTEXT.md`](./CONTEXT.md)，决策见 [`docs/adr/`](./docs/adr/)，规格与票见 [`.scratch/mes-first-phase/`](./.scratch/mes-first-phase/)。
+面向单厂工业路由器整机装配的制造执行参考实现。领域词汇见 [`CONTEXT.md`](./CONTEXT.md)，决策见 [`docs/adr/`](./docs/adr/)，公开证据见 [`docs/research/industrial-router-assembly-traceability.md`](./docs/research/industrial-router-assembly-traceability.md)。
 
-**第一期已验收（票 01–07）。**  
-- 人工演示：[`docs/DEMO.md`](./docs/DEMO.md)  
-- 验收勾选：[`docs/PHASE1_ACCEPTANCE.md`](./docs/PHASE1_ACCEPTANCE.md)  
+> **状态：领域救援重构中，尚未达到试点验收。** 旧一期曾完成演示级技术验证，但其业务模型已被 2026-07-29 的救援决策重新评估；现有代码和测试只作为旧行为基线，不代表制造从业者评审或真实现场验证。
+
+- 旧人工演示记录：[`docs/DEMO.md`](./docs/DEMO.md)
+- 旧技术验证记录：[`docs/PHASE1_ACCEPTANCE.md`](./docs/PHASE1_ACCEPTANCE.md)
 - API 烟测：`pwsh -File docs/DEMO_API.ps1`（API 已启动时）  
 - 自动化：`dotnet test src/Mes.Api.Tests`（含 `Phase1E2eSeamTests`）
 
@@ -21,10 +22,14 @@
 
 ```powershell
 sqllocaldb start MSSQLLocalDB
+dotnet run --project src/Mes.Api -- database migrate
+dotnet run --project src/Mes.Api -- database seed-demo
 dotnet run --project src/Mes.Api
 # http://localhost:5101
 # 或: pwsh -File scripts/run-api.ps1
 ```
+
+`database migrate` 是唯一数据库结构演进入口；`database seed-demo` 仅在非 Production 环境显式装载演示账号、主数据和线边库存。API 普通启动只校验 Migration 兼容性，不建库、不升级、不补种。
 
 健康检查：`GET /health`
 
@@ -80,7 +85,7 @@ docker compose up --build
 ### 02 执行主数据与种子
 - [x] 物料（关键件 / 采 SN）、单层 BOM、线性工艺路线、产线、工位（绑单工序）
 - [x] 种子：`FG-ROUTER` + PCB/PSU/螺丝 + `RT-ROUTER-A` + `L1` 五工位
-- [x] 计划员写、全角色读；变更审计；`POST /api/master-data/seed`
+- [x] 计划员写、全角色读；变更审计；演示主数据由 `database seed-demo` 显式装载
 - [x] 计划端「执行主数据」只读浏览页
 
 ### 03 生产工单与领料
@@ -116,28 +121,22 @@ docker compose up --build
 |------|------|------|
 | GET | `/api/materials` `/api/boms` `/api/process-routes` `/api/production-lines` `/api/work-stations` | 任意业务角色 |
 | POST/PUT/DELETE | 同上资源（物料完整；BOM/路线/线/工位以 POST 创建为主） | 仅计划员 |
-| POST | `/api/master-data/seed` | 仅计划员 |
 
 ## 数据库（LocalDB）
 
-票 01 若已建过只有 `Users` 的 `MesDb`，EF `EnsureCreated` **不会**自动加 `Materials` 等新表，会出现 `Invalid object name 'Materials'`。
-
-**现已处理：** 开发环境启动时 `DatabaseBootstrap` 会探测主数据表；缺失则删库重建并重新种子（仅 Development/Testing）。直接再跑：
+数据库结构统一由 EF Core Migration 管理。首次安装或升级前执行：
 
 ```powershell
-dotnet run --project src/Mes.Api
+dotnet run --project src/Mes.Api -- database migrate
 ```
 
-也可手动删库后启动：
+旧版 `EnsureCreated` 数据库若与已知 Legacy 基线完全一致，显式迁移命令会在保留数据的前提下登记初始 Migration；结构不一致时会拒绝认领，不会删库或补造数据。演示数据必须另行显式装载：
 
 ```powershell
-sqllocaldb stop MSSQLLocalDB
-sqlcmd -S "(localdb)\MSSQLLocalDB" -Q "DROP DATABASE IF EXISTS MesDb"
-sqllocaldb start MSSQLLocalDB
-dotnet run --project src/Mes.Api
+dotnet run --project src/Mes.Api -- database seed-demo
 ```
 
-正式试点请改用 EF Migration，避免 `EnsureDeleted`。
+详细安装、升级、备份与失败回退步骤见 [`docs/DATABASE_OPERATIONS.md`](./docs/DATABASE_OPERATIONS.md)。
 
 ## 用户可见错误文案
 

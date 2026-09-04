@@ -1,6 +1,7 @@
 **/bin/
 **/obj/
 **/node_modules/
+**/__pycache__/
 **/dist/
 **/.vs/
 **/.idea/
@@ -11,4 +12,5 @@
 *.db-shm
 *.db-wal
 web/dist/
+.artifacts/
 .DS_Store

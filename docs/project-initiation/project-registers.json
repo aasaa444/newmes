@@ -1,0 +1,88 @@
+{
+  "metadata": {
+    "project": "工业路由器装配 MES 试点候选项目",
+    "version": "0.1",
+    "date": "2026-07-29",
+    "owner": "李先生",
+    "status": "领域救援与方案设计中"
+  },
+  "raci_roles": ["项目发起人", "客户项目经理", "MES项目经理", "计划", "工艺", "质量", "物料", "ERP/IT", "开发测试"],
+  "raci": [
+    {"activity": "项目章程与范围批准", "values": ["A", "R", "R", "C", "C", "C", "C", "C", "I"]},
+    {"activity": "需求与蓝图基线", "values": ["A", "R", "R", "C", "C", "C", "C", "C", "C"]},
+    {"activity": "工艺路线与作业批准", "values": ["I", "C", "C", "C", "A/R", "C", "I", "I", "C"]},
+    {"activity": "测试规范与质量处置规则", "values": ["I", "C", "C", "I", "C", "A/R", "I", "I", "C"]},
+    {"activity": "ERP接口与主数据映射", "values": ["I", "C", "C", "C", "C", "C", "C", "A/R", "R"]},
+    {"activity": "技术设计与实现", "values": ["I", "I", "A", "C", "C", "C", "C", "C", "R"]},
+    {"activity": "UAT准备与执行", "values": ["I", "A", "R", "R", "R", "R", "R", "R", "C"]},
+    {"activity": "生产环境与备份恢复", "values": ["I", "C", "C", "I", "I", "I", "I", "A/R", "R"]},
+    {"activity": "上线决策", "values": ["A", "R", "C", "C", "C", "C", "C", "C", "I"]},
+    {"activity": "最终验收", "values": ["A", "R", "C", "C", "C", "C", "C", "C", "I"]}
+  ],
+  "wbs": [
+    {"id": "R0-01", "stage": "R0", "deliverable": "项目前期文档与需求追踪基线", "owner": "MES项目经理", "duration_days": 2, "depends_on": "", "exit": "文档、需求和证据等级一致"},
+    {"id": "R0-02", "stage": "R0", "deliverable": "旧行为与依赖风险基线", "owner": "开发测试", "duration_days": 1, "depends_on": "R0-01", "exit": "旧测试定位和依赖处置计划确认"},
+    {"id": "R1-01", "stage": "R1", "deliverable": "EF Core Migration 与显式初始化", "owner": "开发测试", "duration_days": 2, "depends_on": "R0-02", "exit": "无 EnsureCreated/自动删库"},
+    {"id": "R1-02", "stage": "R1", "deliverable": "SQL Server 新装与升级测试", "owner": "开发测试", "duration_days": 2, "depends_on": "R1-01", "exit": "空库和带数据升级通过"},
+    {"id": "R1-03", "stage": "R1", "deliverable": "生产配置与密钥门禁", "owner": "ERP/IT", "duration_days": 1, "depends_on": "R1-01", "exit": "生产错误配置拒绝启动"},
+    {"id": "R2-01", "stage": "R2", "deliverable": "生产订单生命周期与受控变更", "owner": "开发测试", "duration_days": 2, "depends_on": "R1-02", "exit": "状态机与负向测试通过"},
+    {"id": "R2-02", "stage": "R2", "deliverable": "自包含执行快照", "owner": "开发测试", "duration_days": 2, "depends_on": "R2-01", "exit": "模板变化不影响已下达订单"},
+    {"id": "R2-03", "stage": "R2", "deliverable": "身份、START_WIP 与制造事件", "owner": "开发测试", "duration_days": 2, "depends_on": "R2-02", "exit": "订单到单件在制纵向切片通过"},
+    {"id": "R2-04", "stage": "R2", "deliverable": "物料事务账与三种追溯粒度", "owner": "开发测试", "duration_days": 2, "depends_on": "R2-03", "exit": "交接/发料/耗用/冲正可对账"},
+    {"id": "R3-01", "stage": "R3", "deliverable": "固件、测试规范与逐项测量", "owner": "开发测试", "duration_days": 3, "depends_on": "R2-04", "exit": "失败与复测记录独立"},
+    {"id": "R3-02", "stage": "R3", "deliverable": "不合格、质量保留与处置", "owner": "开发测试", "duration_days": 3, "depends_on": "R3-01", "exit": "处置权限和门禁通过"},
+    {"id": "R3-03", "stage": "R3", "deliverable": "完整单件谱系查询与导出", "owner": "开发测试", "duration_days": 2, "depends_on": "R3-02", "exit": "三条制造场景谱系完整"},
+    {"id": "R4-01", "stage": "R4", "deliverable": "Inbox 与幂等入站", "owner": "开发测试", "duration_days": 2, "depends_on": "R3-03", "exit": "重复和失败报文测试通过"},
+    {"id": "R4-02", "stage": "R4", "deliverable": "Outbox、重试、死信与回执", "owner": "开发测试", "duration_days": 2, "depends_on": "R4-01", "exit": "失败恢复和并发认领通过"},
+    {"id": "R4-03", "stage": "R4", "deliverable": "模拟 ERP 与对账工作台", "owner": "开发测试", "duration_days": 1, "depends_on": "R4-02", "exit": "模拟器走正式契约"},
+    {"id": "R5-01", "stage": "R5", "deliverable": "计划/工位/质量/追溯核心 UI", "owner": "开发测试", "duration_days": 4, "depends_on": "R4-03", "exit": "四条流程可浏览器执行"},
+    {"id": "R5-02", "stage": "R5", "deliverable": "浏览器 E2E 与视觉修复", "owner": "开发测试", "duration_days": 2, "depends_on": "R5-01", "exit": "关键视口无阻塞缺陷"},
+    {"id": "R6-01", "stage": "R6", "deliverable": "HTTPS 私有化部署与恢复演练", "owner": "ERP/IT", "duration_days": 2, "depends_on": "R5-02", "exit": "部署、升级、备份恢复证据完成"},
+    {"id": "R6-02", "stage": "R6", "deliverable": "版本化技术验证证据包", "owner": "MES项目经理", "duration_days": 2, "depends_on": "R6-01", "exit": "需求到证据全链路可复现"},
+    {"id": "R6-03", "stage": "R6", "deliverable": "方案汇报与面试材料", "owner": "MES项目经理", "duration_days": 1, "depends_on": "R6-02", "exit": "技术/售前/项目经理三套讲法一致"}
+  ],
+  "raid": [
+    {"id": "RISK-001", "type": "Risk", "description": "无真实制造专家导致业务规则失真", "probability": "High", "impact": "High", "owner": "MES项目经理", "response": "公开证据分级；可配置；从业者评审门禁", "status": "Open"},
+    {"id": "RISK-002", "type": "Risk", "description": "ERP 版本和接口能力未知", "probability": "High", "impact": "High", "owner": "ERP/IT", "response": "接口盘点、样例报文和技术账号验证前不承诺字段", "status": "Open"},
+    {"id": "RISK-003", "type": "Risk", "description": "旧测试锁定错误业务语义", "probability": "High", "impact": "High", "owner": "开发测试", "response": "旧测试降级为行为记录；新验收场景先行", "status": "Mitigating"},
+    {"id": "RISK-004", "type": "Risk", "description": "旧数据缺失快照和制造事实", "probability": "High", "impact": "Medium", "owner": "开发测试", "response": "Legacy 只读；不补造历史；新订单走新模型", "status": "Open"},
+    {"id": "RISK-005", "type": "Risk", "description": "UI 扩张再次挤占领域内核", "probability": "Medium", "impact": "High", "owner": "项目发起人", "response": "R5 前冻结非核心 UI；需求追踪门禁", "status": "Mitigating"},
+    {"id": "RISK-006", "type": "Risk", "description": "SQL Server 与 SQLite 行为不一致", "probability": "Medium", "impact": "High", "owner": "开发测试", "response": "真实 SQL Server 迁移、事务、并发测试", "status": "Open"},
+    {"id": "ASM-001", "type": "Assumption", "description": "试点从已测 PCBA 的整机装配开始", "probability": "N/A", "impact": "High", "owner": "工艺", "response": "现场价值流和 SOP 确认", "status": "To Validate"},
+    {"id": "ASM-002", "type": "Assumption", "description": "参考路线足以支撑候选演示", "probability": "N/A", "impact": "High", "owner": "工艺", "response": "工艺工作坊确认实际顺序、返工点和工位", "status": "To Validate"},
+    {"id": "ASM-003", "type": "Assumption", "description": "RPO 24h / RTO 4h 可用于试点", "probability": "N/A", "impact": "Medium", "owner": "ERP/IT", "response": "业务连续性评审", "status": "To Validate"},
+    {"id": "DEP-001", "type": "Dependency", "description": "Docker 与 SQL Server 测试运行环境可用", "probability": "N/A", "impact": "High", "owner": "ERP/IT", "response": "R1 开始前验证运行环境和镜像获取", "status": "Open"},
+    {"id": "DEP-002", "type": "Dependency", "description": "真实联调依赖 ERP 接口文档、账号和沙箱", "probability": "N/A", "impact": "High", "owner": "ERP/IT", "response": "候选阶段只实现正式契约与模拟器", "status": "Open"},
+    {"id": "ISSUE-001", "type": "Issue", "description": "当前 Compose 硬编码密钥并运行 Development", "probability": "N/A", "impact": "High", "owner": "开发测试", "response": "R1 建立生产配置门禁", "status": "Open"}
+  ],
+  "interfaces": [
+    {"id": "IF-001", "name": "ProductMasterUpsert", "direction": "ERP -> MES", "object": "产品与单位", "trigger": "新增/变更", "idempotency": "SourceSystem + MessageId", "ack": "Accepted/Rejected", "status": "Contract Candidate"},
+    {"id": "IF-002", "name": "MaterialMasterUpsert", "direction": "ERP -> MES", "object": "物料与单位", "trigger": "新增/变更", "idempotency": "SourceSystem + MessageId", "ack": "Accepted/Rejected", "status": "Contract Candidate"},
+    {"id": "IF-003", "name": "ProductionOrderUpsert", "direction": "ERP -> MES", "object": "生产订单", "trigger": "创建/受控变更", "idempotency": "SourceSystem + OrderNo + SourceVersion", "ack": "Accepted/Rejected/ChangeRequired", "status": "Contract Candidate"},
+    {"id": "IF-004", "name": "MaterialTransferNotice", "direction": "ERP/WMS -> MES", "object": "物料交接", "trigger": "线边交接", "idempotency": "TransferNo + LineNo", "ack": "Received/Rejected", "status": "To Validate"},
+    {"id": "IF-005", "name": "ProductionCompletion", "direction": "MES -> ERP", "object": "合格完工", "trigger": "每 SN 或汇总", "idempotency": "CompletionEventId", "ack": "Posted/Rejected", "status": "Contract Candidate"},
+    {"id": "IF-006", "name": "MaterialConsumption", "direction": "MES -> ERP", "object": "耗用/冲正", "trigger": "实际耗用或结算", "idempotency": "MaterialTransactionId", "ack": "Posted/Rejected", "status": "Contract Candidate"},
+    {"id": "IF-007", "name": "ScrapDeclaration", "direction": "MES -> ERP", "object": "报废", "trigger": "报废处置完成", "idempotency": "ScrapEventId", "ack": "Posted/Rejected", "status": "To Validate"},
+    {"id": "IF-008", "name": "WarehouseHandoff", "direction": "MES <-> WMS/仓储", "object": "成品交接", "trigger": "完工后交接", "idempotency": "HandoffEventId", "ack": "Received/Rejected", "status": "To Validate"}
+  ],
+  "uat": [
+    {"id": "UAT-001", "scenario": "正常完工与单件谱系", "roles": "计划/物料/操作/质量/ERP", "requirements": "FR-MD,FR-PO,FR-ID,FR-WIP,FR-MAT,FR-FW,FR-TEST,FR-CMP,FR-TRC", "expected": "固定 SN 完整谱系且三种完成状态可区分", "status": "Not Run"},
+    {"id": "UAT-002", "scenario": "测试失败、返工与复测", "roles": "操作/工艺/质量", "requirements": "FR-TEST,FR-QA,FR-CMP,FR-TRC,FR-SEC", "expected": "原失败保留，处置和复测可追踪，保留期间禁止完工", "status": "Not Run"},
+    {"id": "UAT-003", "scenario": "报废与订单数量平衡", "roles": "计划/质量/物料", "requirements": "FR-PO,FR-MAT,FR-QA,FR-CMP", "expected": "有在制不可取消，报废后数量与物料责任平衡", "status": "Not Run"},
+    {"id": "UAT-004", "scenario": "集成重复、失败、重试与对账", "roles": "计划/ERP/IT", "requirements": "FR-INT,FR-PO,FR-CMP", "expected": "无重复业务结果，失败可恢复，对账前不能关闭", "status": "Not Run"}
+  ],
+  "open_questions": [
+    {"id": "Q-001", "area": "工艺", "question": "实际装配路线、返工点和包装责任是什么？", "owner": "工艺", "gate": "制造从业者评审前", "status": "Open"},
+    {"id": "Q-002", "area": "产品身份", "question": "SN、MAC、证书和标签由谁分配，何时分配？", "owner": "ERP/IT", "gate": "R2 设计确认前", "status": "Open"},
+    {"id": "Q-003", "area": "物料", "question": "哪些物料按 SN、Lot 或数量追溯？", "owner": "工艺/质量", "gate": "R2 设计确认前", "status": "Open"},
+    {"id": "Q-004", "area": "测试", "question": "测试项目、阈值、设备、夹具和原始报告格式是什么？", "owner": "工艺/质量", "gate": "R3 设计确认前", "status": "Open"},
+    {"id": "Q-005", "area": "质量", "question": "缺陷码、MRB、让步和报废审批层级是什么？", "owner": "质量", "gate": "R3 设计确认前", "status": "Open"},
+    {"id": "Q-006", "area": "ERP", "question": "ERP 产品、版本、接口方式和业务单据类型是什么？", "owner": "ERP/IT", "gate": "真实联调估算前", "status": "Open"},
+    {"id": "Q-007", "area": "仓储", "question": "MES 完工、仓储接收和 ERP 入账的责任人及回执是什么？", "owner": "物料/ERP", "gate": "R4 设计确认前", "status": "Open"},
+    {"id": "Q-008", "area": "容量", "question": "班次、产量、并发工位、峰值扫码和测试文件大小是多少？", "owner": "产线/IT", "gate": "性能基线前", "status": "Open"},
+    {"id": "Q-009", "area": "数据", "question": "追溯、审计、测试原始文件和个人信息保存多久？", "owner": "业务/IT", "gate": "生产设计前", "status": "Open"},
+    {"id": "Q-010", "area": "基础设施", "question": "服务器、网络分区、证书、备份和灾备约束是什么？", "owner": "ERP/IT", "gate": "部署评审前", "status": "Open"},
+    {"id": "Q-011", "area": "验收", "question": "最终业务验收人、试运行周期和签收标准是什么？", "owner": "项目发起人", "gate": "项目立项前", "status": "Open"},
+    {"id": "Q-012", "area": "变更", "question": "投产后的订单数量、日期和执行依据变更如何审批？", "owner": "计划/工艺", "gate": "R2 设计确认前", "status": "Open"}
+  ]
+}

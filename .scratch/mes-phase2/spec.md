@@ -1,9 +1,11 @@
 # MES 二期 — 可运营企业壳与工作台
 
-**Status:** ready-for-agent  
+**Status:** suspended-by-rescue
 **Parent:** 二期 grill-with-docs 共识 + `CONTEXT.md`（二期术语）+ `docs/adr/0006`–`0010`  
 **Depends on:** 一期已验收闭环（`.scratch/mes-first-phase/`，票 01–07）  
 **Primary test seam (confirmed):** 见文末 Testing Decisions  
+
+> 2026-07-29：二期功能票暂停。项目先按 ADR-0011 至 ADR-0014 完成公开证据驱动的追溯内核救援；现有二期测试仅作为旧行为记录，不作为业务正确性证明。恢复二期前须重新评审本规格及全部未完成票。
 
 ---
 
