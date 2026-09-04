@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="430" viewBox="0 0 1200 430" role="img" aria-labelledby="title desc">
+  <title id="title">NewMES 领域证据链</title>
+  <desc id="desc">从 ERP 订单幂等入站到审计留痕的制造执行证据链：快照冻结、物料账、谱系、版本化测试与质量处置。</desc>
+  <rect width="1200" height="430" rx="24" fill="#0a0e14"/>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <text x="60" y="62" fill="#effbfc" font-size="38" font-weight="800">领域证据链</text>
+    <text x="60" y="94" fill="#91aeb9" font-size="19">每个环节只追加、不覆盖：谁在何时用哪个版本的数据做了什么，结果如何。</text>
+  </g>
+  <g font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', sans-serif">
+    <g transform="translate(60 130)">
+      <rect width="250" height="96" rx="14" fill="#102c3a" stroke="#2bd9d0"/>
+      <text x="20" y="36" fill="#7de9e1" font-size="15" font-weight="800">01 · 入站</text>
+      <text x="20" y="64" fill="#eef8f9" font-size="19" font-weight="700">ERP 订单幂等接收</text>
+      <text x="20" y="86" fill="#8eb0ba" font-size="15">收件箱去重 + 报文指纹</text>
+    </g>
+    <g transform="translate(340 130)">
+      <rect width="250" height="96" rx="14" fill="#102c3a" stroke="#2bd9d0"/>
+      <text x="20" y="36" fill="#7de9e1" font-size="15" font-weight="800">02 · 下达</text>
+      <text x="20" y="64" fill="#eef8f9" font-size="19" font-weight="700">执行快照冻结</text>
+      <text x="20" y="86" fill="#8eb0ba" font-size="15">冻结产品 / BOM / 路线版本</text>
+    </g>
+    <g transform="translate(620 130)">
+      <rect width="250" height="96" rx="14" fill="#102c3a" stroke="#2bd9d0"/>
+      <text x="20" y="36" fill="#7de9e1" font-size="15" font-weight="800">03 · 执行</text>
+      <text x="20" y="64" fill="#eef8f9" font-size="19" font-weight="700">物料账与装配绑定</text>
+      <text x="20" y="86" fill="#8eb0ba" font-size="15">线边事务账 · 关键件绑定</text>
+    </g>
+    <g transform="translate(900 130)">
+      <rect width="240" height="96" rx="14" fill="#102c3a" stroke="#2bd9d0"/>
+      <text x="20" y="36" fill="#7de9e1" font-size="15" font-weight="800">04 · 身份</text>
+      <text x="20" y="64" fill="#eef8f9" font-size="19" font-weight="700">SN 发号与谱系</text>
+      <text x="20" y="86" fill="#8eb0ba" font-size="15">正反向追溯 · 召回导出</text>
+    </g>
+    <g transform="translate(60 266)">
+      <rect width="250" height="96" rx="14" fill="#3a2b1d" stroke="#f5aa48"/>
+      <text x="20" y="36" fill="#ffd49b" font-size="15" font-weight="800">05 · 质检</text>
+      <text x="20" y="64" fill="#fff0d8" font-size="19" font-weight="700">版本化测试执行</text>
+      <text x="20" y="86" fill="#c8ae88" font-size="15">规范哈希 · 逐项判定</text>
+    </g>
+    <g transform="translate(340 266)">
+      <rect width="250" height="96" rx="14" fill="#3a2b1d" stroke="#f5aa48"/>
+      <text x="20" y="36" fill="#ffd49b" font-size="15" font-weight="800">06 · 处置</text>
+      <text x="20" y="64" fill="#fff0d8" font-size="19" font-weight="700">不合格与质量保留</text>
+      <text x="20" y="86" fill="#c8ae88" font-size="15">隔离阻断 · 返工 / 报废</text>
+    </g>
+    <g transform="translate(620 266)">
+      <rect width="250" height="96" rx="14" fill="#3a2b1d" stroke="#f5aa48"/>
+      <text x="20" y="36" fill="#ffd49b" font-size="15" font-weight="800">07 · 完工</text>
+      <text x="20" y="64" fill="#fff0d8" font-size="19" font-weight="700">入库与 ERP 回报</text>
+      <text x="20" y="86" fill="#c8ae88" font-size="15">发件箱对账 · 工单关闭</text>
+    </g>
+    <g transform="translate(900 266)">
+      <rect width="240" height="96" rx="14" fill="#20223d" stroke="#ae9bea"/>
+      <text x="20" y="36" fill="#cdc4f5" font-size="15" font-weight="800">08 · 留痕</text>
+      <text x="20" y="64" fill="#f0ecff" font-size="19" font-weight="700">追加式审计</text>
+      <text x="20" y="86" fill="#aaa3c8" font-size="15">因果链 · 角色快照</text>
+    </g>
+  </g>
+  <g fill="none" stroke="#4f8391" stroke-width="2.5" stroke-linecap="round">
+    <path d="M310 178H340M590 178H620M870 178H900"/>
+    <path d="M310 314H340M590 314H620M870 314H900"/>
+  </g>
+  <text x="60" y="400" fill="#7798a3" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="16">原则：计划权威在 ERP，执行权威在 MES；状态只追加不覆盖，秘密全部外置。</text>
+</svg>

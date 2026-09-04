@@ -1,24 +1,50 @@
-# 工业路由器装配 MES（单厂试点候选）
+<p align="center">
+  <img src="./assets/readme/hero.svg" width="100%" alt="工业路由器装配 MES：.NET 10 + SQL Server 的证据驱动制造执行参考实现，领域救援重构中，含 28 篇 ADR 与 SQL Server 集成测试门禁。">
+</p>
 
-面向单厂工业路由器整机装配的制造执行参考实现。领域词汇见 [`CONTEXT.md`](./CONTEXT.md)，决策见 [`docs/adr/`](./docs/adr/)，公开证据见 [`docs/research/industrial-router-assembly-traceability.md`](./docs/research/industrial-router-assembly-traceability.md)。
+<p align="center">
+  <a href="#这是什么">这是什么</a> ·
+  <a href="#领域证据链">领域证据链</a> ·
+  <a href="#仓库结构">仓库结构</a> ·
+  <a href="#快速开始">快速开始</a> ·
+  <a href="#票进度">票进度</a>
+</p>
 
 > **状态：领域救援重构中，尚未达到试点验收。** 旧一期曾完成演示级技术验证，但其业务模型已被 2026-07-29 的救援决策重新评估；现有代码和测试只作为旧行为基线，不代表制造从业者评审或真实现场验证。
 
-- 旧人工演示记录：[`docs/DEMO.md`](./docs/DEMO.md)
-- 旧技术验证记录：[`docs/PHASE1_ACCEPTANCE.md`](./docs/PHASE1_ACCEPTANCE.md)
-- API 烟测：`pwsh -File docs/DEMO_API.ps1`（API 已启动时）  
-- 自动化：`dotnet test src/Mes.Api.Tests`（含 `Phase1E2eSeamTests`）
+## 这是什么
 
-## 技术栈
+面向单厂工业路由器整机装配的制造执行参考实现（单厂试点候选）。计划权威在 ERP，执行权威在 MES；系统以"证据优先"推进——每个制造动作留下可追溯、不可覆盖的记录。
 
-- 后端：ASP.NET Core（.NET 10）+ SQL Server（开发可用 LocalDB）
-- 前端：Vue 3 + Vue Router（计划端 / 过站台分布局）
-- 测试：xUnit + `WebApplicationFactory`（SQLite 内存库）
+- 领域词汇：[`CONTEXT.md`](./CONTEXT.md)
+- 架构决策：[`docs/adr/`](./docs/adr/)（0011-0028 覆盖救援决策、追溯优先、幂等入站、安全基线等）
+- 公开证据研究：[`docs/research/industrial-router-assembly-traceability.md`](./docs/research/industrial-router-assembly-traceability.md)
+
+## 领域证据链
+
+<p align="center">
+  <img src="./assets/readme/domain-flow.svg" width="100%" alt="领域证据链：ERP 订单幂等接收 → 执行快照冻结 → 物料账与装配绑定 → SN 发号与谱系 → 版本化测试执行 → 不合格与质量保留 → 入库与 ERP 回报 → 追加式审计。">
+</p>
+
+## 仓库结构
+
+| 路径 | 说明 |
+| --- | --- |
+| `NewMES/` | **救援内核（现行开发）**：独立解决方案，领域 / 基础设施 / API / DbMigrator 分层，含真实 SQL Server 集成测试（`Mes.SqlServer.IntegrationTests`）。详见 [`NewMES/README.md`](./NewMES/README.md) |
+| `src/` | 旧一期技术验证（演示级），仅作旧行为基线保留，不再扩展 |
+| `web/` | Vue 3 计划端 / 过站台前端（旧一期骨架） |
+| `docs/` | ADR 0011-0028、项目立项文档、公开证据研究 |
+| `deliverables/` | 立项交付物：立项书 / 解决方案蓝图 / 实施验收方案 / 管理台账 / 方案汇报 |
+
+## 快速开始
+
+### 环境
+
+- 后端：ASP.NET Core（**.NET 10**）+ SQL Server（开发可用 LocalDB）
+- 前端：Vue 3 + Vue Router
 - 交付：`docker-compose.yml`（需 Docker 守护进程）
 
-## 快速开始（无 Docker）
-
-### API
+### API（无 Docker，旧基线路径）
 
 ```powershell
 sqllocaldb start MSSQLLocalDB
@@ -33,9 +59,9 @@ dotnet run --project src/Mes.Api
 
 健康检查：`GET /health`
 
-**若感觉「API 自己停了」：**  
-本仓库项目已设 `UseAppHost=false`，避免编译抢锁时必须杀掉 `Mes.Api.exe`。  
-请用**单独终端**只跑 API；不要在同一窗口边跑 API 边 `dotnet test` 若仍被杀。  
+**若感觉「API 自己停了」：**
+本仓库项目已设 `UseAppHost=false`，避免编译抢锁时必须杀掉 `Mes.Api.exe`。
+请用**单独终端**只跑 API；不要在同一窗口边跑 API 边 `dotnet test` 若仍被杀。
 正常关闭日志会出现 `ApplicationStopping`；**强杀进程时可能没有任何关闭日志**。
 
 ### Web
@@ -57,13 +83,7 @@ npm run dev
 | leader | Leader@123 | 班组长 Leader | 管理端·在制区（暂工单页） |
 | owner | Owner@123 | 经营者 Owner | 管理端·总览区（暂计划首页） |
 
-## 测试
-
-```powershell
-dotnet test src/Mes.Api.Tests
-```
-
-## Docker Compose
+### Docker Compose
 
 Docker Desktop 运行后：
 
@@ -71,11 +91,23 @@ Docker Desktop 运行后：
 docker compose up --build
 ```
 
-- API：http://localhost:8080  
-- Web：http://localhost:8081  
+- API：http://localhost:8080
+- Web：http://localhost:8081
 - SQL Server：localhost:1433（sa / `Mes_Dev_Passw0rd!`）
 
 当前环境若 Docker 引擎未启动，请用 LocalDB 开发路径。
+
+## 测试
+
+```powershell
+# 旧基线（SQLite 内存库 + WebApplicationFactory）
+dotnet test src/Mes.Api.Tests
+
+# 救援内核：真实 SQL Server 集成测试（运行方式见 NewMES/README.md）
+# NewMES/tests/Mes.SqlServer.IntegrationTests
+```
+
+测试门禁原则：不以 SQLite 内存库证据作为发布证据；领域内核的发布以真实 SQL Server 集成测试为准（ADR 0026）。
 
 ## 票进度
 
@@ -115,12 +147,16 @@ docker compose up --build
 - [x] `Phase1E2eSeamTests` 高缝自动化
 - [x] `docs/DEMO_API.ps1` 无 UI 烟测
 
+旧人工演示记录：[`docs/DEMO.md`](./docs/DEMO.md) · 旧技术验证记录：[`docs/PHASE1_ACCEPTANCE.md`](./docs/PHASE1_ACCEPTANCE.md)
+
 ## 主数据 API（摘要）
 
 | 方法 | 路径 | 授权 |
 |------|------|------|
 | GET | `/api/materials` `/api/boms` `/api/process-routes` `/api/production-lines` `/api/work-stations` | 任意业务角色 |
 | POST/PUT/DELETE | 同上资源（物料完整；BOM/路线/线/工位以 POST 创建为主） | 仅计划员 |
+
+API 烟测：`pwsh -File docs/DEMO_API.ps1`（API 已启动时）
 
 ## 数据库（LocalDB）
 
@@ -140,5 +176,5 @@ dotnet run --project src/Mes.Api -- database seed-demo
 
 ## 用户可见错误文案
 
-业务异常（过站、领料、绑定、质量、入库等）通过 API 的 `error` 字段返回**中文**提示，便于产线与演示。  
+业务异常（过站、领料、绑定、质量、入库等）通过 API 的 `error` 字段返回**中文**提示，便于产线与演示。
 审计动作码、ERP 报文类型等系统标识仍为英文（如 `StationPass`、`MaterialIssue`）。
